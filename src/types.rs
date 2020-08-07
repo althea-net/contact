@@ -1,5 +1,8 @@
+use clarity::Address as EthAddress;
 use deep_space::address::Address;
 use deep_space::coin::Coin;
+use deep_space::stdsignmsg::StdSignMsg;
+use num256::Uint256;
 use serde::{de, Deserialize, Deserializer};
 use std::{fmt::Display, str::FromStr};
 
@@ -101,6 +104,52 @@ pub struct BlockSignature {
     pub signature: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct UpdateEthAddressTX {
+    #[serde(rename = "BaseReq")]
+    pub base_request: StdSignMsg,
+    #[serde(rename = "EthSig")]
+    pub eth_signature: Uint256,
+}
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct ValsetRequestTX {
+    #[serde(rename = "BaseReq")]
+    pub base_request: StdSignMsg,
+}
+
+/// a transaction we send to submit a valset confirmation signature
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct ValsetConfirmTX {
+    #[serde(rename = "BaseReq")]
+    pub base_request: StdSignMsg,
+    #[serde(rename = "Nonce")]
+    pub nonce: Uint256,
+    #[serde(rename = "EthSig")]
+    pub eth_signature: Uint256,
+}
+
+/// the response we get when querying for a valset confirmation
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct ValsetConfirmResponse {
+    #[serde(rename = "Validator")]
+    pub validator: Address,
+    #[serde(rename = "Nonce")]
+    pub nonce: Uint256,
+    #[serde(rename = "Signature")]
+    pub eth_signature: Uint256,
+}
+
+/// a list of validators, powers, and eth addresses at a given block height
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct ValsetResponse {
+    #[serde(rename = "Nonce")]
+    pub nonce: Uint256,
+    #[serde(rename = "Powers")]
+    pub powers: Uint256,
+    #[serde(rename = "EthAddresses")]
+    pub eth_addresses: Vec<EthAddress>,
+}
+
 /// Adapter that lets us parse any val that implements from_str into
 /// the type we want, this helps solve type problems like sigs or addresses
 /// being presented as strings and requiring a parse. For our own types like
@@ -124,7 +173,8 @@ mod tests {
 
     #[test]
     fn decode_block_summary() {
-        let file = read_to_string("test_files/block_endpoint").expect("Failed to read test files!");
+        let file =
+            read_to_string("test_files/block_endpoint.json").expect("Failed to read test files!");
 
         let _decoded: LatestBlockEndpointResponse = serde_json::from_str(&file).unwrap();
     }

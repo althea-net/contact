@@ -35,7 +35,7 @@ impl HTTPClient {
     pub async fn request_method<T: Serialize, R: 'static>(
         &self,
         method: &str,
-        params: T,
+        params: Option<T>,
         timeout: Duration,
         request_size_limit: Option<usize>,
     ) -> Result<R, JsonRpcError>
@@ -44,21 +44,30 @@ impl HTTPClient {
         // T: std::fmt::Debug,
         R: std::fmt::Debug,
     {
-        // the payload size limit for this request, almost everything
+        // the response payload size limit for this request, almost everything
         // will set this to None, and get the default 64k, but some requests
         // need bigger buffers (like full block requests)
         let limit = match request_size_limit {
             Some(val) => val,
             None => 65536,
         };
-        let payload = Request::new(self.next_id(), method, params);
-        let res = self
-            .client
-            .post(&self.url)
-            .header(header::CONTENT_TYPE, "application/json")
-            .timeout(timeout)
-            .send_json(&payload)
-            .await;
+        // if we don't have a payload this is a get request
+        let res = if let Some(params) = params {
+            let payload = Request::new(self.next_id(), method, params);
+            self.client
+                .post(&self.url)
+                .header(header::CONTENT_TYPE, "application/json")
+                .timeout(timeout)
+                .send_json(&payload)
+                .await
+        } else {
+            self.client
+                .get(&self.url)
+                .header(header::CONTENT_TYPE, "application/json")
+                .timeout(timeout)
+                .send()
+                .await
+        };
         let mut res = match res {
             Ok(val) => val,
             Err(e) => return Err(JsonRpcError::FailedToSend(e.to_string())),
