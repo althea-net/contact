@@ -1,7 +1,7 @@
 use clarity::Address as EthAddress;
 use deep_space::address::Address;
 use deep_space::coin::Coin;
-use deep_space::stdsignmsg::StdSignMsg;
+use deep_space::stdsignmsg::BaseReq;
 use num256::Uint256;
 use serde::{de, Deserialize, Deserializer};
 use std::{fmt::Display, str::FromStr};
@@ -107,25 +107,25 @@ pub struct BlockSignature {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct UpdateEthAddressTX {
     #[serde(rename = "BaseReq")]
-    pub base_request: StdSignMsg,
+    pub base_request: BaseReq,
     #[serde(rename = "EthSig")]
-    pub eth_signature: Uint256,
+    pub eth_signature: Vec<u8>,
 }
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ValsetRequestTX {
     #[serde(rename = "BaseReq")]
-    pub base_request: StdSignMsg,
+    pub base_request: BaseReq,
 }
 
 /// a transaction we send to submit a valset confirmation signature
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ValsetConfirmTX {
     #[serde(rename = "BaseReq")]
-    pub base_request: StdSignMsg,
+    pub base_request: BaseReq,
     #[serde(rename = "Nonce")]
     pub nonce: Uint256,
     #[serde(rename = "EthSig")]
-    pub eth_signature: Uint256,
+    pub eth_signature: Vec<u8>,
 }
 
 /// the response we get when querying for a valset confirmation
@@ -136,7 +136,7 @@ pub struct ValsetConfirmResponse {
     #[serde(rename = "Nonce")]
     pub nonce: Uint256,
     #[serde(rename = "Signature")]
-    pub eth_signature: Uint256,
+    pub eth_signature: Vec<u8>,
 }
 
 /// a list of validators, powers, and eth addresses at a given block height
@@ -148,6 +148,13 @@ pub struct ValsetResponse {
     pub powers: Uint256,
     #[serde(rename = "EthAddresses")]
     pub eth_addresses: Vec<EthAddress>,
+}
+
+#[derive(Debug, Clone)]
+pub struct OptionalTXInfo {
+    pub chain_id: String,
+    pub account_number: u64,
+    pub sequence: u64,
 }
 
 /// Adapter that lets us parse any val that implements from_str into

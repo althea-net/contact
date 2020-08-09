@@ -9,3 +9,4 @@ extern crate log;
 pub mod client;
 pub mod jsonrpc;
 pub mod types;
+pub mod utils;

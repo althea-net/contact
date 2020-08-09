@@ -6,7 +6,8 @@ edition = "2018"
 
 
 [dependencies]
-deep_space = {git = "https://github.com/althea-net/deep_space/", rev = "b386eecf59f7271b88566e7af664df45b164fe2e"}
+# deep_space = {git = "https://github.com/althea-net/deep_space/", rev = "260cf8400b160d5a6700dfc6f24be7600dff7b17"}
+deep_space = {path = "../deep_space"}
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
