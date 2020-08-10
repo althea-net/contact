@@ -5,10 +5,9 @@ use crate::utils::maybe_get_optional_tx_info;
 use clarity::PrivateKey as EthPrivateKey;
 use deep_space::address::Address;
 use deep_space::coin::Coin;
-use deep_space::msg::{Msg, SendMsg};
+use deep_space::msg::{Msg, SendMsg, SetEthAddressMsg, ValsetConfirmMsg, ValsetRequestMsg};
 use deep_space::private_key::PrivateKey;
 use deep_space::stdfee::StdFee;
-use deep_space::stdsignmsg::BaseReq;
 use deep_space::stdsignmsg::StdSignMsg;
 use deep_space::transaction::Transaction;
 use num256::Uint256;
@@ -66,9 +65,9 @@ impl Contact {
     pub async fn create_and_send_transaction(
         &self,
         coin: Coin,
+        fee: Coin,
         destination: Address,
         private_key: PrivateKey,
-        fee_denom: String,
         chain_id: Option<String>,
         account_number: Option<u64>,
         sequence: Option<u64>,
@@ -88,10 +87,7 @@ impl Contact {
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
-                amount: vec![Coin {
-                    denom: fee_denom,
-                    amount: 42u32.into(),
-                }],
+                amount: vec![fee],
                 gas: 200_000u64.into(),
             },
             msgs: vec![Msg::SendMsg(SendMsg {
@@ -105,7 +101,7 @@ impl Contact {
         let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
 
         self.jsonrpc_client
-            .request_method("blocks/latest", Some(tx), self.timeout, None)
+            .request_method("/txs", Some(tx), self.timeout, None)
             .await
     }
 
@@ -157,7 +153,7 @@ impl Contact {
         &self,
         eth_private_key: EthPrivateKey,
         private_key: PrivateKey,
-        fee_denom: String,
+        fee: Coin,
         chain_id: Option<String>,
         account_number: Option<u64>,
         sequence: Option<u64>,
@@ -171,32 +167,30 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
+        let eth_address = eth_private_key.to_public_key().unwrap();
+        let eth_signature = eth_private_key.sign_msg(eth_address.to_string().as_bytes());
+
         // todo determine what this operation costs and use that rather than 42
-        let base_request = BaseReq {
+        let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
-                amount: vec![Coin {
-                    denom: fee_denom,
-                    amount: 42u32.into(),
-                }],
+                amount: vec![fee],
                 gas: 200_000u64.into(),
             },
-            msgs: Vec::new(),
+            msgs: vec![Msg::SetEthAddressMsg(SetEthAddressMsg {
+                eth_address,
+                validator: our_address,
+                eth_signature: eth_signature.to_bytes().to_vec(),
+            })],
             memo: String::new(),
         };
 
-        let eth_address = eth_private_key.to_public_key().unwrap();
-        let eth_signature = eth_private_key.sign_msg(eth_address.to_string().as_bytes());
-
-        let msg: UpdateEthAddressTX = UpdateEthAddressTX {
-            base_request,
-            eth_signature: eth_signature.to_bytes().to_vec(),
-        };
+        let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
 
         self.jsonrpc_client
-            .request_method("peggy/update_ethaddr", Some(msg), self.timeout, None)
+            .request_method("/txs", Some(tx), self.timeout, None)
             .await
     }
 
@@ -205,7 +199,7 @@ impl Contact {
     pub async fn send_valset_request(
         &self,
         private_key: PrivateKey,
-        fee_denom: String,
+        fee: Coin,
         chain_id: Option<String>,
         account_number: Option<u64>,
         sequence: Option<u64>,
@@ -220,25 +214,24 @@ impl Contact {
                 .await?;
 
         // todo determine what this operation costs and use that rather than 42
-        let base_request = BaseReq {
+        let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
-                amount: vec![Coin {
-                    denom: fee_denom,
-                    amount: 42u32.into(),
-                }],
+                amount: vec![fee],
                 gas: 200_000u64.into(),
             },
-            msgs: Vec::new(),
+            msgs: vec![Msg::ValsetRequestMsg(ValsetRequestMsg {
+                requester: our_address,
+            })],
             memo: String::new(),
         };
 
-        let msg = ValsetRequestTX { base_request };
+        let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
 
         self.jsonrpc_client
-            .request_method("peggy/valset_request", Some(msg), self.timeout, None)
+            .request_method("txs/", Some(tx), self.timeout, None)
             .await
     }
 
@@ -247,10 +240,10 @@ impl Contact {
     pub async fn send_valset_confirm(
         &self,
         eth_private_key: EthPrivateKey,
+        fee: Coin,
         valset: Vec<u8>,
         valset_nonce: Uint256,
         private_key: PrivateKey,
-        fee_denom: String,
         chain_id: Option<String>,
         account_number: Option<u64>,
         sequence: Option<u64>,
@@ -264,32 +257,29 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
+        let eth_signature = eth_private_key.sign_msg(&valset);
+
         // todo determine what this operation costs and use that rather than 42
-        let base_request = BaseReq {
+        let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
-                amount: vec![Coin {
-                    denom: fee_denom,
-                    amount: 42u32.into(),
-                }],
+                amount: vec![fee],
                 gas: 200_000u64.into(),
             },
-            msgs: Vec::new(),
+            msgs: vec![Msg::ValsetConfirmMsg(ValsetConfirmMsg {
+                validator: our_address,
+                nonce: valset_nonce,
+                eth_signature: eth_signature.to_bytes().to_vec(),
+            })],
             memo: String::new(),
         };
 
-        let eth_signature = eth_private_key.sign_msg(&valset);
-
-        let msg = ValsetConfirmTX {
-            base_request,
-            nonce: valset_nonce,
-            eth_signature: eth_signature.to_bytes().to_vec(),
-        };
+        let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
 
         self.jsonrpc_client
-            .request_method("peggy/valset_confirm", Some(msg), self.timeout, None)
+            .request_method("peggy/valset_confirm", Some(tx), self.timeout, None)
             .await
     }
 }

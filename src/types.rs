@@ -1,7 +1,6 @@
 use clarity::Address as EthAddress;
 use deep_space::address::Address;
 use deep_space::coin::Coin;
-use deep_space::stdsignmsg::BaseReq;
 use num256::Uint256;
 use serde::{de, Deserialize, Deserializer};
 use std::{fmt::Display, str::FromStr};
@@ -102,30 +101,6 @@ pub struct BlockSignature {
     pub validator_address: Address,
     pub timestamp: String,
     pub signature: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct UpdateEthAddressTX {
-    #[serde(rename = "BaseReq")]
-    pub base_request: BaseReq,
-    #[serde(rename = "EthSig")]
-    pub eth_signature: Vec<u8>,
-}
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ValsetRequestTX {
-    #[serde(rename = "BaseReq")]
-    pub base_request: BaseReq,
-}
-
-/// a transaction we send to submit a valset confirmation signature
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ValsetConfirmTX {
-    #[serde(rename = "BaseReq")]
-    pub base_request: BaseReq,
-    #[serde(rename = "Nonce")]
-    pub nonce: Uint256,
-    #[serde(rename = "EthSig")]
-    pub eth_signature: Vec<u8>,
 }
 
 /// the response we get when querying for a valset confirmation
