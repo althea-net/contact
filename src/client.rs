@@ -62,11 +62,13 @@ impl Contact {
     }
 
     /// The hand holding version of send transaction that does it all for you
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_and_send_transaction(
         &self,
         coin: Coin,
         destination: Address,
         private_key: PrivateKey,
+        fee_denom: String,
         chain_id: Option<String>,
         account_number: Option<u64>,
         sequence: Option<u64>,
@@ -80,15 +82,14 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
-        // todo there is no way to estimate gas, fix in
-        // Cosmos
+        // todo determine what this operation costs and use that rather than 42
         let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![Coin {
-                    denom: coin.denom.clone(),
+                    denom: fee_denom,
                     amount: 42u32.into(),
                 }],
                 gas: 200_000u64.into(),
@@ -156,6 +157,7 @@ impl Contact {
         &self,
         eth_private_key: EthPrivateKey,
         private_key: PrivateKey,
+        fee_denom: String,
         chain_id: Option<String>,
         account_number: Option<u64>,
         sequence: Option<u64>,
@@ -169,16 +171,14 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
-        // todo there is no way to estimate gas, fix in
-        // Cosmos
+        // todo determine what this operation costs and use that rather than 42
         let base_request = BaseReq {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
-                // todo figure out native coin denom and drop it in maybe_get_optional_tx_info
                 amount: vec![Coin {
-                    denom: "denom".to_string(),
+                    denom: fee_denom,
                     amount: 42u32.into(),
                 }],
                 gas: 200_000u64.into(),
@@ -205,6 +205,7 @@ impl Contact {
     pub async fn send_valset_request(
         &self,
         private_key: PrivateKey,
+        fee_denom: String,
         chain_id: Option<String>,
         account_number: Option<u64>,
         sequence: Option<u64>,
@@ -218,16 +219,14 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
-        // todo there is no way to estimate gas, fix in
-        // Cosmos
+        // todo determine what this operation costs and use that rather than 42
         let base_request = BaseReq {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
-                // todo figure out native coin denom and drop it in maybe_get_optional_tx_info
                 amount: vec![Coin {
-                    denom: "denom".to_string(),
+                    denom: fee_denom,
                     amount: 42u32.into(),
                 }],
                 gas: 200_000u64.into(),
@@ -251,6 +250,7 @@ impl Contact {
         valset: Vec<u8>,
         valset_nonce: Uint256,
         private_key: PrivateKey,
+        fee_denom: String,
         chain_id: Option<String>,
         account_number: Option<u64>,
         sequence: Option<u64>,
@@ -264,16 +264,14 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
-        // todo there is no way to estimate gas, fix in
-        // Cosmos
+        // todo determine what this operation costs and use that rather than 42
         let base_request = BaseReq {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
-                // todo figure out native coin denom and drop it in maybe_get_optional_tx_info
                 amount: vec![Coin {
-                    denom: "denom".to_string(),
+                    denom: fee_denom,
                     amount: 42u32.into(),
                 }],
                 gas: 200_000u64.into(),
