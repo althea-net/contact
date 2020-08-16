@@ -7,6 +7,13 @@ use std::{fmt::Display, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CosmosAccountInfoWrapper {
+    #[serde(deserialize_with = "parse_val")]
+    pub height: u128,
+    pub result: CosmosAccountWrapper,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct CosmosAccountWrapper {
     #[serde(rename = "type")]
     pub account_type: String,
     pub value: CosmosAccountInfo,
@@ -14,9 +21,11 @@ pub struct CosmosAccountInfoWrapper {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CosmosAccountInfo {
-    pub account_number: String,
+    pub address: String,
+    pub public_key: String,
+    pub account_number: u128,
     pub coins: Vec<Coin>,
-    pub sequence: String,
+    pub sequence: u128,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -128,8 +137,22 @@ pub struct ValsetResponse {
 #[derive(Debug, Clone)]
 pub struct OptionalTXInfo {
     pub chain_id: String,
-    pub account_number: u64,
-    pub sequence: u64,
+    pub account_number: u128,
+    pub sequence: u128,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct TXSendResponse {
+    pub code: u128,
+    pub codespace: String,
+    #[serde(deserialize_with = "parse_val")]
+    pub gas_used: u128,
+    #[serde(deserialize_with = "parse_val")]
+    pub gas_wanted: u128,
+    #[serde(deserialize_with = "parse_val")]
+    pub height: u128,
+    pub raw_log: String,
+    pub txhash: String,
 }
 
 /// Adapter that lets us parse any val that implements from_str into
@@ -157,7 +180,19 @@ mod tests {
     fn decode_block_summary() {
         let file =
             read_to_string("test_files/block_endpoint.json").expect("Failed to read test files!");
+        let _decoded: LatestBlockEndpointResponse = serde_json::from_str(&file).unwrap();
+
+        let file =
+            read_to_string("test_files/block_endpoint_2.json").expect("Failed to read test files!");
 
         let _decoded: LatestBlockEndpointResponse = serde_json::from_str(&file).unwrap();
+    }
+
+    #[test]
+    fn decode_account_info() {
+        let file =
+            read_to_string("test_files/account_info.json").expect("Failed to read test files!");
+
+        let _decoded: CosmosAccountInfoWrapper = serde_json::from_str(&file).unwrap();
     }
 }

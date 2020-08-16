@@ -10,17 +10,14 @@ use deep_space::address::Address;
 pub async fn maybe_get_optional_tx_info(
     our_address: Address,
     chain_id: Option<String>,
-    account_number: Option<u64>,
-    sequence: Option<u64>,
+    account_number: Option<u128>,
+    sequence: Option<u128>,
     client: &Contact,
 ) -> Result<OptionalTXInfo, JsonRpcError> {
     // if the user provides values use those, otherwise fallback to retrieving them
     let (account_number, sequence) = if account_number.is_none() || sequence.is_none() {
         let info = client.get_account_info(our_address).await?;
-        (
-            info.value.account_number.parse().unwrap(),
-            info.value.sequence.parse().unwrap(),
-        )
+        (info.result.value.account_number, info.result.value.sequence)
     } else {
         (account_number.unwrap(), sequence.unwrap())
     };

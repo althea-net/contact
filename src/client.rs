@@ -23,8 +23,12 @@ pub struct Contact {
 
 impl Contact {
     pub fn new(url: &str, timeout: Duration) -> Self {
+        let mut url = url;
+        if !url.ends_with('/') {
+            url = url.trim_end_matches('/');
+        }
         Self {
-            jsonrpc_client: Arc::new(Box::new(HTTPClient::new(url))),
+            jsonrpc_client: Arc::new(Box::new(HTTPClient::new(&url))),
             timeout,
         }
     }
@@ -54,7 +58,7 @@ impl Contact {
 
     /// The advanced version of create_and_send transaction that expects you to
     /// perform your own signing and prep first.
-    pub async fn send_transaction(&self, msg: Transaction) -> Result<(), JsonRpcError> {
+    pub async fn send_transaction(&self, msg: Transaction) -> Result<TXSendResponse, JsonRpcError> {
         self.jsonrpc_client
             .request_method("txs", Some(msg), self.timeout, None)
             .await
@@ -69,9 +73,10 @@ impl Contact {
         destination: Address,
         private_key: PrivateKey,
         chain_id: Option<String>,
-        account_number: Option<u64>,
-        sequence: Option<u64>,
-    ) -> Result<(), JsonRpcError> {
+        account_number: Option<u128>,
+        sequence: Option<u128>,
+    ) -> Result<TXSendResponse, JsonRpcError> {
+        trace!("Creating transaction");
         let our_address = private_key
             .to_public_key()
             .expect("Invalid private key!")
@@ -101,7 +106,7 @@ impl Contact {
         let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
 
         self.jsonrpc_client
-            .request_method("/txs", Some(tx), self.timeout, None)
+            .request_method("txs", Some(tx), self.timeout, None)
             .await
     }
 
@@ -155,9 +160,11 @@ impl Contact {
         private_key: PrivateKey,
         fee: Coin,
         chain_id: Option<String>,
-        account_number: Option<u64>,
-        sequence: Option<u64>,
-    ) -> Result<(), JsonRpcError> {
+        account_number: Option<u128>,
+        sequence: Option<u128>,
+    ) -> Result<TXSendResponse, JsonRpcError> {
+        println!("test?");
+        trace!("Updating Peggy ETH address");
         let our_address = private_key
             .to_public_key()
             .expect("Invalid private key!")
@@ -166,6 +173,7 @@ impl Contact {
         let tx_info =
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
+        trace!("got optional tx info");
 
         let eth_address = eth_private_key.to_public_key().unwrap();
         let eth_signature = eth_private_key.sign_msg(eth_address.to_string().as_bytes());
@@ -188,9 +196,10 @@ impl Contact {
         };
 
         let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
+        trace!("signed message {:?}", tx);
 
         self.jsonrpc_client
-            .request_method("/txs", Some(tx), self.timeout, None)
+            .request_method("txs", Some(tx), self.timeout, None)
             .await
     }
 
@@ -201,9 +210,9 @@ impl Contact {
         private_key: PrivateKey,
         fee: Coin,
         chain_id: Option<String>,
-        account_number: Option<u64>,
-        sequence: Option<u64>,
-    ) -> Result<(), JsonRpcError> {
+        account_number: Option<u128>,
+        sequence: Option<u128>,
+    ) -> Result<TXSendResponse, JsonRpcError> {
         let our_address = private_key
             .to_public_key()
             .expect("Invalid private key!")
@@ -231,7 +240,7 @@ impl Contact {
         let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
 
         self.jsonrpc_client
-            .request_method("txs/", Some(tx), self.timeout, None)
+            .request_method("txs", Some(tx), self.timeout, None)
             .await
     }
 
@@ -245,9 +254,9 @@ impl Contact {
         valset_nonce: Uint256,
         private_key: PrivateKey,
         chain_id: Option<String>,
-        account_number: Option<u64>,
-        sequence: Option<u64>,
-    ) -> Result<(), JsonRpcError> {
+        account_number: Option<u128>,
+        sequence: Option<u128>,
+    ) -> Result<TXSendResponse, JsonRpcError> {
         let our_address = private_key
             .to_public_key()
             .expect("Invalid private key!")
@@ -281,5 +290,63 @@ impl Contact {
         self.jsonrpc_client
             .request_method("peggy/valset_confirm", Some(tx), self.timeout, None)
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix::Arbiter;
+    use actix::System;
+    use rand::{self, Rng};
+
+    /// If you run the start-chains.sh script in the peggy repo it will pass
+    /// port 1317 on localhost through to the peggycli rest-server which can
+    /// then be used to run this test and debug things quickly.
+    #[test]
+    #[ignore]
+    fn test_endpoints() {
+        let mut rng = rand::thread_rng();
+        let secret: [u8; 20] = rng.gen();
+
+        let key = PrivateKey::from_secret(&secret);
+        let address = key
+            .to_public_key()
+            .expect("Failed to convert to pubkey!")
+            .to_address();
+        let contact = Contact::new("http://localhost:1317", Duration::from_secs(5));
+
+        let res = System::run(move || {
+            Arbiter::spawn(async move {
+                let res = contact.get_latest_block().await;
+                res.expect("Failed to get latest block");
+
+                let res = contact.get_account_info(address).await;
+                res.expect("Failed to get account info");
+
+                let res = contact
+                    .create_and_send_transaction(
+                        Coin {
+                            denom: "test".to_string(),
+                            amount: 5u32.into(),
+                        },
+                        Coin {
+                            denom: "test".to_string(),
+                            amount: 5u32.into(),
+                        },
+                        key.to_public_key().unwrap().to_address(),
+                        key,
+                        None,
+                        None,
+                        None,
+                    )
+                    .await;
+                println!("{:?}", res);
+                System::current().stop();
+            });
+        });
+        if res.is_err() {
+            error!("Error in actix system {:?}", res);
+        }
     }
 }

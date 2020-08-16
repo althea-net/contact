@@ -1,16 +1,13 @@
 use crate::jsonrpc::error::JsonRpcError;
-use crate::jsonrpc::request::Request;
-use crate::jsonrpc::response::Response;
 use actix_web::client::Client;
 use actix_web::http::header;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
+use serde_json::from_value;
+use serde_json::Value;
 use std::str;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub struct HTTPClient {
-    id_counter: Arc<Mutex<RefCell<i64>>>,
     url: String,
     client: Client,
 }
@@ -18,18 +15,9 @@ pub struct HTTPClient {
 impl HTTPClient {
     pub fn new(url: &str) -> Self {
         Self {
-            id_counter: Arc::new(Mutex::new(RefCell::new(0i64))),
             url: url.to_string(),
             client: Client::default(),
         }
-    }
-
-    fn next_id(&self) -> i64 {
-        let counter = self.id_counter.clone();
-        let counter = counter.lock().expect("id error");
-        let mut value = counter.borrow_mut();
-        *value += 1;
-        *value
     }
 
     pub async fn request_method<T: Serialize, R: 'static>(
@@ -44,6 +32,7 @@ impl HTTPClient {
         // T: std::fmt::Debug,
         R: std::fmt::Debug,
     {
+        trace!("About to make contact request");
         // the response payload size limit for this request, almost everything
         // will set this to None, and get the default 64k, but some requests
         // need bigger buffers (like full block requests)
@@ -51,18 +40,18 @@ impl HTTPClient {
             Some(val) => val,
             None => 65536,
         };
+        let url_with_method = format!("{}/{}", self.url, method);
         // if we don't have a payload this is a get request
         let res = if let Some(params) = params {
-            let payload = Request::new(self.next_id(), method, params);
             self.client
-                .post(&self.url)
+                .post(&url_with_method)
                 .header(header::CONTENT_TYPE, "application/json")
                 .timeout(timeout)
-                .send_json(&payload)
+                .send_json(&params)
                 .await
         } else {
             self.client
-                .get(&self.url)
+                .get(&url_with_method)
                 .header(header::CONTENT_TYPE, "application/json")
                 .timeout(timeout)
                 .send()
@@ -70,24 +59,36 @@ impl HTTPClient {
         };
         let mut res = match res {
             Ok(val) => val,
-            Err(e) => return Err(JsonRpcError::FailedToSend(e.to_string())),
+            Err(e) => {
+                return Err(JsonRpcError::FailedToSend(format!(
+                    "Failed to send to {} with {:?}",
+                    self.url, e,
+                )))
+            }
         };
-        println!("{:?}", res);
-        let res: Response<R> = match res.json().limit(limit).await {
+        let status = res.status();
+        if !status.is_success() {
+            return Err(JsonRpcError::BadResponse(format!(
+                "Server Error {}",
+                status
+            )));
+        }
+
+        // this layer of error handling is not technically required, you could
+        // replace this layer with a direct parse into Result<R, Error> but that's
+        // much harder to debug since there's no way to actually display serde value
+        // you're looking for.
+        let json_value: Result<Value, _> = res.json().limit(limit).await;
+        println!("got Cosmos JSONRPC response {:#?}", json_value);
+        let json: Value = match json_value {
             Ok(val) => val,
             Err(e) => return Err(JsonRpcError::BadResponse(e.to_string())),
         };
-        trace!("got Cosmos JSONRPC response {:#?}", res);
-        println!("got Cosmos JSONRPC response {:#?}", res);
-        let data = res.data.into_result();
+        let data: R = match from_value(json) {
+            Ok(val) => val,
+            Err(e) => return Err(JsonRpcError::BadResponse(e.to_string())),
+        };
 
-        match data {
-            Ok(val) => Ok(val),
-            Err(e) => Err(JsonRpcError::ResponseError {
-                code: e.code,
-                message: e.message,
-                data: format!("{:?}", e.data),
-            }),
-        }
+        Ok(data)
     }
 }
