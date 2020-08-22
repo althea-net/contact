@@ -32,7 +32,11 @@ impl HTTPClient {
         // T: std::fmt::Debug,
         R: std::fmt::Debug,
     {
-        trace!("About to make contact request");
+        println!(
+            "About to make contact request to {} with payload {}",
+            method,
+            json!(params)
+        );
         // the response payload size limit for this request, almost everything
         // will set this to None, and get the default 64k, but some requests
         // need bigger buffers (like full block requests)

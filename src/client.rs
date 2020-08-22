@@ -86,14 +86,13 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
-        // todo determine what this operation costs and use that rather than 42
         let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 200_000u64.into(),
+                gas: 20_000u64.into(),
             },
             msgs: vec![Msg::SendMsg(SendMsg {
                 from_address: our_address,
@@ -104,6 +103,7 @@ impl Contact {
         };
 
         let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
+        trace!("{}", json!(tx));
 
         self.jsonrpc_client
             .request_method("txs", Some(tx), self.timeout, None)
@@ -111,7 +111,7 @@ impl Contact {
     }
 
     /// Get the latest valset recorded by the peggy module may or may not be complete
-    pub async fn get_peggy_valset(&self) -> Result<ValsetResponse, JsonRpcError> {
+    pub async fn get_peggy_valset(&self) -> Result<ValsetResponseWrapper, JsonRpcError> {
         let none: Option<bool> = None;
         self.jsonrpc_client
             .request_method("peggy/current_valset", none, self.timeout, None)
@@ -121,8 +121,8 @@ impl Contact {
     /// get the valset for a given nonce (block) height
     pub async fn get_peggy_valset_request(
         &self,
-        nonce: Uint256,
-    ) -> Result<ValsetResponse, JsonRpcError> {
+        nonce: u128,
+    ) -> Result<ValsetResponseWrapper, JsonRpcError> {
         let none: Option<bool> = None;
         self.jsonrpc_client
             .request_method(
@@ -138,14 +138,17 @@ impl Contact {
     /// when ferrying valsets over to the Cosmos chain
     pub async fn get_peggy_valset_confirmation(
         &self,
-        nonce: Uint256,
+        nonce: u128,
         validator_address: Address,
     ) -> Result<ValsetConfirmResponse, JsonRpcError> {
-        let none: Option<bool> = None;
+        let payload = QueryValsetConfirm {
+            nonce: nonce.to_string(),
+            address: format!("{}", validator_address),
+        };
         self.jsonrpc_client
             .request_method(
-                &format!("peggy/valset_confirm/{}/{}", nonce, validator_address),
-                none,
+                &"peggy/query_valset_confirm".to_string(),
+                Some(payload),
                 self.timeout,
                 None,
             )
@@ -163,7 +166,6 @@ impl Contact {
         account_number: Option<u128>,
         sequence: Option<u128>,
     ) -> Result<TXSendResponse, JsonRpcError> {
-        println!("test?");
         trace!("Updating Peggy ETH address");
         let our_address = private_key
             .to_public_key()
@@ -176,16 +178,20 @@ impl Contact {
         trace!("got optional tx info");
 
         let eth_address = eth_private_key.to_public_key().unwrap();
-        let eth_signature = eth_private_key.sign_msg(eth_address.to_string().as_bytes());
+        let eth_signature = eth_private_key.sign_msg(our_address.as_bytes());
+        println!(
+            "sig: {} address: {}",
+            clarity::utils::bytes_to_hex_str(&eth_signature.to_bytes()),
+            clarity::utils::bytes_to_hex_str(eth_address.as_bytes())
+        );
 
-        // todo determine what this operation costs and use that rather than 42
         let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 200_000u64.into(),
+                gas: 20_000u64.into(),
             },
             msgs: vec![Msg::SetEthAddressMsg(SetEthAddressMsg {
                 eth_address,
@@ -196,7 +202,6 @@ impl Contact {
         };
 
         let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
-        trace!("signed message {:?}", tx);
 
         self.jsonrpc_client
             .request_method("txs", Some(tx), self.timeout, None)
@@ -222,14 +227,13 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
-        // todo determine what this operation costs and use that rather than 42
         let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 200_000u64.into(),
+                gas: 20_000u64.into(),
             },
             msgs: vec![Msg::ValsetRequestMsg(ValsetRequestMsg {
                 requester: our_address,
@@ -238,6 +242,7 @@ impl Contact {
         };
 
         let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
+        trace!("{}", json!(tx));
 
         self.jsonrpc_client
             .request_method("txs", Some(tx), self.timeout, None)
@@ -275,7 +280,7 @@ impl Contact {
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 200_000u64.into(),
+                gas: 20_000u64.into(),
             },
             msgs: vec![Msg::ValsetConfirmMsg(ValsetConfirmMsg {
                 validator: our_address,
@@ -299,54 +304,149 @@ mod tests {
     use actix::Arbiter;
     use actix::System;
     use rand::{self, Rng};
+    /// simple test used to get raw signature bytes to feed into other
+    /// applications for testing. Specifically to get signing compatibility
+    /// with go-ethereum
+    #[test]
+    #[ignore]
+    fn get_sig() {
+        use sha3::{Digest, Keccak256};
+        let mut rng = rand::thread_rng();
+        let secret: [u8; 32] = rng.gen();
+        let eth_private_key = EthPrivateKey::from_slice(&secret).expect("Failed to parse eth key");
+        let eth_address = eth_private_key.to_public_key().unwrap();
+        let msg = eth_address.as_bytes();
+        let eth_signature = eth_private_key.sign_msg(msg);
+        let digest = Keccak256::digest(msg);
+        println!(
+            "sig: 0x{} hash: 0x{} address: 0x{}",
+            clarity::utils::bytes_to_hex_str(&eth_signature.to_bytes()),
+            clarity::utils::bytes_to_hex_str(&digest),
+            clarity::utils::bytes_to_hex_str(eth_address.as_bytes())
+        );
+    }
 
     /// If you run the start-chains.sh script in the peggy repo it will pass
     /// port 1317 on localhost through to the peggycli rest-server which can
-    /// then be used to run this test and debug things quickly.
+    /// then be used to run this test and debug things quickly. Obviously none
+    /// of the transactions will actually send since the random address won't have
+    /// any tokens. But the rpc server is kind enough to tell you when the tx would
+    /// have sent and there just aren't funds.
     #[test]
     #[ignore]
     fn test_endpoints() {
         let mut rng = rand::thread_rng();
-        let secret: [u8; 20] = rng.gen();
+        let secret: [u8; 32] = rng.gen();
 
         let key = PrivateKey::from_secret(&secret);
-        let address = key
-            .to_public_key()
-            .expect("Failed to convert to pubkey!")
-            .to_address();
+        let eth_private_key = EthPrivateKey::from_slice(&secret).expect("Failed to parse eth key");
         let contact = Contact::new("http://localhost:1317", Duration::from_secs(5));
 
         let res = System::run(move || {
             Arbiter::spawn(async move {
-                let res = contact.get_latest_block().await;
-                res.expect("Failed to get latest block");
+                let res = test_rpc_calls(contact, key, eth_private_key, address).await;
+                if res.is_err() {
+                    println!("{:?}", res);
+                    System::current().stop_with_code(1);
+                }
 
-                let res = contact.get_account_info(address).await;
-                res.expect("Failed to get account info");
-
-                let res = contact
-                    .create_and_send_transaction(
-                        Coin {
-                            denom: "test".to_string(),
-                            amount: 5u32.into(),
-                        },
-                        Coin {
-                            denom: "test".to_string(),
-                            amount: 5u32.into(),
-                        },
-                        key.to_public_key().unwrap().to_address(),
-                        key,
-                        None,
-                        None,
-                        None,
-                    )
-                    .await;
-                println!("{:?}", res);
                 System::current().stop();
             });
         });
-        if res.is_err() {
-            error!("Error in actix system {:?}", res);
+
+        if let Err(e) = res {
+            panic!(format!("{:?}", e))
         }
     }
+}
+
+pub async fn test_rpc_calls(
+    contact: Contact,
+    key: PrivateKey,
+    eth_private_key: EthPrivateKey,
+) -> Result<(), String> {
+    let address = key
+        .to_public_key()
+        .expect("Failed to convert to pubkey!")
+        .to_address();
+
+    let res = contact.get_latest_block().await;
+    if res.is_err() {
+        return Err(format!("Failed to get latest block {:?}", res));
+    }
+
+    let res = contact.get_account_info(address).await;
+    if res.is_err() {
+        return Err(format!("Failed to get account info {:?}", res));
+    }
+
+    let res = contact
+        .create_and_send_transaction(
+            Coin {
+                denom: "test".to_string(),
+                amount: 5u32.into(),
+            },
+            Coin {
+                denom: "test".to_string(),
+                amount: 5u32.into(),
+            },
+            key.to_public_key().unwrap().to_address(),
+            key,
+            None,
+            None,
+            None,
+        )
+        .await;
+    if res.is_err() {
+        return Err(format!("Failed to send tx {:?}", res));
+    }
+
+    let res = contact.get_peggy_valset_request(0).await;
+    if res.is_err() {
+        return Err(format!("Failed to get valset request {:?}", res));
+    }
+
+    let res = contact.get_peggy_valset().await;
+    if res.is_err() {
+        return Err(format!("Failed to get valset {:?}", res));
+    }
+
+    let res = contact.get_peggy_valset_confirmation(0, address).await;
+    if res.is_err() {
+        return Err(format!("Failed to get valset confirmation {:?}", res));
+    }
+
+    let res = contact
+        .send_valset_request(
+            key,
+            Coin {
+                denom: "test".to_string(),
+                amount: 5u32.into(),
+            },
+            None,
+            None,
+            None,
+        )
+        .await;
+    if res.is_err() {
+        return Err(format!("Failed to send valset request {:?}", res));
+    }
+
+    let res = contact
+        .update_peggy_eth_address(
+            eth_private_key,
+            key,
+            Coin {
+                denom: "test".to_string(),
+                amount: 5u32.into(),
+            },
+            None,
+            None,
+            None,
+        )
+        .await;
+    if res.is_err() {
+        return Err(format!("Failed to update eth address {:?}", res));
+    }
+    Ok(())
 }

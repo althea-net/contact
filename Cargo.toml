@@ -6,8 +6,8 @@ edition = "2018"
 
 
 [dependencies]
-deep_space = {git = "https://github.com/althea-net/deep_space/", rev = "fb6495c72882376c6bb43f3ba7e891716564f954", features = ["peggy", "key_import"]}
-#deep_space = {path = "../deep_space"}
+deep_space = {git = "https://github.com/althea-net/deep_space/", rev = "bc3bfff3d7fc79b604d00315b24d29e8c254d807", features = ["peggy", "key_import"]}
+# deep_space = {path = "../deep_space"}
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -15,7 +15,9 @@ actix-web = {version = "2.0", features=["openssl"]}
 log = "0.4"
 num256 = "0.2"
 clarity = "0.1"
+# clarity = {path = "../clarity"}
 
 [dev-dependencies]
 rand = "0.7"
 actix = "0.9"
+sha3 = "0.8"

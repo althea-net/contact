@@ -116,22 +116,42 @@ pub struct BlockSignature {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ValsetConfirmResponse {
     #[serde(rename = "Validator")]
-    pub validator: Address,
+    pub validator: Option<Address>,
     #[serde(rename = "Nonce")]
     pub nonce: Uint256,
     #[serde(rename = "Signature")]
-    pub eth_signature: Vec<u8>,
+    pub eth_signature: Option<Vec<u8>>,
+}
+
+/// wrapper struct for the valset response endpoint which
+/// returns the response wrapped in this struct containing
+/// info about which block the response is in reference to
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct ValsetResponseWrapper {
+    #[serde(deserialize_with = "parse_val")]
+    pub height: u128,
+    pub result: ValsetResponse,
 }
 
 /// a list of validators, powers, and eth addresses at a given block height
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ValsetResponse {
-    #[serde(rename = "Nonce")]
+    #[serde(rename = "Nonce", deserialize_with = "parse_val")]
     pub nonce: Uint256,
     #[serde(rename = "Powers")]
-    pub powers: Uint256,
+    pub powers: Option<Vec<Uint256>>,
     #[serde(rename = "EthAddresses")]
-    pub eth_addresses: Vec<EthAddress>,
+    pub eth_addresses: Option<Vec<EthAddress>>,
+}
+
+/// the query struct required to get the valset request sent by a specific
+/// validator. This is required because the url encoded get methods don't
+/// parse addresses well. So there's no way to get an individual validators
+/// address without sending over a json body
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct QueryValsetConfirm {
+    pub nonce: String,
+    pub address: String,
 }
 
 #[derive(Debug, Clone)]
