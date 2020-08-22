@@ -86,14 +86,13 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
-        // todo determine what this operation costs and use that rather than 42
         let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 200_000u64.into(),
+                gas: 20_000u64.into(),
             },
             msgs: vec![Msg::SendMsg(SendMsg {
                 from_address: our_address,
@@ -104,6 +103,7 @@ impl Contact {
         };
 
         let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
+        trace!("{}", json!(tx));
 
         self.jsonrpc_client
             .request_method("txs", Some(tx), self.timeout, None)
@@ -163,7 +163,6 @@ impl Contact {
         account_number: Option<u128>,
         sequence: Option<u128>,
     ) -> Result<TXSendResponse, JsonRpcError> {
-        println!("test?");
         trace!("Updating Peggy ETH address");
         let our_address = private_key
             .to_public_key()
@@ -176,16 +175,20 @@ impl Contact {
         trace!("got optional tx info");
 
         let eth_address = eth_private_key.to_public_key().unwrap();
-        let eth_signature = eth_private_key.sign_msg(eth_address.to_string().as_bytes());
+        let eth_signature = eth_private_key.sign_msg(our_address.as_bytes());
+        println!(
+            "sig: {} address: {}",
+            clarity::utils::bytes_to_hex_str(&eth_signature.to_bytes()),
+            clarity::utils::bytes_to_hex_str(eth_address.as_bytes())
+        );
 
-        // todo determine what this operation costs and use that rather than 42
         let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 200_000u64.into(),
+                gas: 20_000u64.into(),
             },
             msgs: vec![Msg::SetEthAddressMsg(SetEthAddressMsg {
                 eth_address,
@@ -196,7 +199,6 @@ impl Contact {
         };
 
         let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
-        trace!("signed message {:?}", tx);
 
         self.jsonrpc_client
             .request_method("txs", Some(tx), self.timeout, None)
@@ -222,14 +224,13 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
-        // todo determine what this operation costs and use that rather than 42
         let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 200_000u64.into(),
+                gas: 20_000u64.into(),
             },
             msgs: vec![Msg::ValsetRequestMsg(ValsetRequestMsg {
                 requester: our_address,
@@ -238,6 +239,7 @@ impl Contact {
         };
 
         let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
+        trace!("{}", json!(tx));
 
         self.jsonrpc_client
             .request_method("txs", Some(tx), self.timeout, None)
@@ -275,7 +277,7 @@ impl Contact {
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 200_000u64.into(),
+                gas: 20_000u64.into(),
             },
             msgs: vec![Msg::ValsetConfirmMsg(ValsetConfirmMsg {
                 validator: our_address,
@@ -307,9 +309,10 @@ mod tests {
     #[ignore]
     fn test_endpoints() {
         let mut rng = rand::thread_rng();
-        let secret: [u8; 20] = rng.gen();
+        let secret: [u8; 32] = rng.gen();
 
         let key = PrivateKey::from_secret(&secret);
+        let eth_private_key = EthPrivateKey::from_slice(&secret).expect("Failed to parse eth key");
         let address = key
             .to_public_key()
             .expect("Failed to convert to pubkey!")
@@ -318,24 +321,53 @@ mod tests {
 
         let res = System::run(move || {
             Arbiter::spawn(async move {
-                let res = contact.get_latest_block().await;
-                res.expect("Failed to get latest block");
+                // let res = contact.get_latest_block().await;
+                // res.expect("Failed to get latest block");
 
-                let res = contact.get_account_info(address).await;
-                res.expect("Failed to get account info");
+                // let res = contact.get_account_info(address).await;
+                // res.expect("Failed to get account info");
+
+                // let res = contact
+                //     .create_and_send_transaction(
+                //         Coin {
+                //             denom: "test".to_string(),
+                //             amount: 5u32.into(),
+                //         },
+                //         Coin {
+                //             denom: "test".to_string(),
+                //             amount: 5u32.into(),
+                //         },
+                //         key.to_public_key().unwrap().to_address(),
+                //         key,
+                //         None,
+                //         None,
+                //         None,
+                //     )
+                //     .await;
+                // res.expect("Failed to send tx");
+
+                // let res = contact
+                //     .send_valset_request(
+                //         key,
+                //         Coin {
+                //             denom: "test".to_string(),
+                //             amount: 5u32.into(),
+                //         },
+                //         None,
+                //         None,
+                //         None,
+                //     )
+                //     .await;
+                // res.expect("Failed to send valset request");
 
                 let res = contact
-                    .create_and_send_transaction(
-                        Coin {
-                            denom: "test".to_string(),
-                            amount: 5u32.into(),
-                        },
-                        Coin {
-                            denom: "test".to_string(),
-                            amount: 5u32.into(),
-                        },
-                        key.to_public_key().unwrap().to_address(),
+                    .update_peggy_eth_address(
+                        eth_private_key,
                         key,
+                        Coin {
+                            denom: "test".to_string(),
+                            amount: 5u32.into(),
+                        },
                         None,
                         None,
                         None,
