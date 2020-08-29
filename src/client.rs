@@ -393,40 +393,61 @@ pub async fn test_rpc_calls(
         .expect("Failed to convert to pubkey!")
         .to_address();
 
+    test_basic_calls(&contact, key, test_token_name, fee.clone(), address).await?;
+    test_valset_request_calls(&contact, key, eth_private_key, fee.clone()).await?;
+
+    Ok(())
+}
+
+async fn test_basic_calls(
+    contact: &Contact,
+    key: PrivateKey,
+    test_token_name: String,
+    fee: Coin,
+    address: Address,
+) -> Result<(), String> {
     // start by validating the basics
     //
     // get the latest block
     // get our account info
     // send a base transaction
 
-    // let res = contact.get_latest_block().await;
-    // if res.is_err() {
-    //     return Err(format!("Failed to get latest block {:?}", res));
-    // }
+    let res = contact.get_latest_block().await;
+    if res.is_err() {
+        return Err(format!("Failed to get latest block {:?}", res));
+    }
 
-    // let res = contact.get_account_info(address).await;
-    // if res.is_err() {
-    //     return Err(format!("Failed to get account info {:?}", res));
-    // }
+    let res = contact.get_account_info(address).await;
+    if res.is_err() {
+        return Err(format!("Failed to get account info {:?}", res));
+    }
 
-    // let res = contact
-    //     .create_and_send_transaction(
-    //         Coin {
-    //             denom: test_token_name.clone(),
-    //             amount: 5u32.into(),
-    //         },
-    //         fee.clone(),
-    //         key.to_public_key().unwrap().to_address(),
-    //         key,
-    //         None,
-    //         None,
-    //         None,
-    //     )
-    //     .await;
-    // if res.is_err() {
-    //     return Err(format!("Failed to send tx {:?}", res));
-    // }
+    let res = contact
+        .create_and_send_transaction(
+            Coin {
+                denom: test_token_name.clone(),
+                amount: 5u32.into(),
+            },
+            fee.clone(),
+            key.to_public_key().unwrap().to_address(),
+            key,
+            None,
+            None,
+            None,
+        )
+        .await;
+    if res.is_err() {
+        return Err(format!("Failed to send tx {:?}", res));
+    }
+    Ok(())
+}
 
+async fn test_valset_request_calls(
+    contact: &Contact,
+    key: PrivateKey,
+    eth_private_key: EthPrivateKey,
+    fee: Coin,
+) -> Result<(), String> {
     // next we update our eth address so that we can be sure it's present in the resulting valset
     // request
     let res = contact
@@ -505,15 +526,5 @@ pub async fn test_rpc_calls(
     } else {
         return Err("Failed to get valset request that should exist".to_string());
     }
-    // let res = contact.get_peggy_valset().await;
-    // if res.is_err() {
-    //     return Err(format!("Failed to get valset {:?}", res));
-    // }
-
-    // // let res = contact.get_peggy_valset_confirmation(0, address).await;
-    // // if res.is_err() {
-    // //     return Err(format!("Failed to get valset confirmation {:?}", res));
-    // // }
-
     Ok(())
 }
