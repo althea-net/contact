@@ -2,7 +2,9 @@ use clarity::Address as EthAddress;
 use deep_space::address::Address;
 use deep_space::coin::Coin;
 use num256::Uint256;
-use serde::{de, Deserialize, Deserializer};
+use serde::de::Deserializer;
+use serde::{de, Deserialize};
+use serde_json::Value;
 use std::{fmt::Display, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -82,7 +84,7 @@ pub struct Block {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BlockData {
-    pub txs: Option<Vec<Transaction>>,
+    pub txs: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -128,7 +130,6 @@ pub struct ValsetConfirmResponse {
 /// info about which block the response is in reference to
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ValsetResponseWrapper {
-    #[serde(deserialize_with = "parse_val")]
     pub height: u128,
     pub result: ValsetResponse,
 }
@@ -136,12 +137,60 @@ pub struct ValsetResponseWrapper {
 /// a list of validators, powers, and eth addresses at a given block height
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ValsetResponse {
-    #[serde(rename = "Nonce", deserialize_with = "parse_val")]
     pub nonce: Uint256,
+    pub powers: Vec<Uint256>,
+    pub eth_addresses: Vec<Option<EthAddress>>,
+}
+
+/// a list of validators, powers, and eth addresses at a given block height
+/// this version is used by the endpoint to get the data and is then processed
+/// by "convert" into ValsetResponse. Making this struct purely internal
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct ValsetResponseUnparsed {
+    #[serde(rename = "Nonce", deserialize_with = "parse_val")]
+    nonce: Uint256,
     #[serde(rename = "Powers")]
-    pub powers: Option<Vec<Uint256>>,
+    powers: Vec<Uint256>,
     #[serde(rename = "EthAddresses")]
-    pub eth_addresses: Option<Vec<EthAddress>>,
+    eth_addresses: Vec<String>,
+}
+/// Another internal intermediary function to dedal with empty
+/// strings as addresses
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct ValsetResponseUnparsedWrapper {
+    #[serde(deserialize_with = "parse_val")]
+    pub height: u128,
+    pub result: ValsetResponseUnparsed,
+}
+
+impl ValsetResponseUnparsedWrapper {
+    pub fn convert(self) -> ValsetResponseWrapper {
+        ValsetResponseWrapper {
+            height: self.height,
+            result: self.result.convert(),
+        }
+    }
+}
+
+impl ValsetResponseUnparsed {
+    pub fn convert(self) -> ValsetResponse {
+        let mut out = Vec::new();
+        for maybe_addr in self.eth_addresses.iter() {
+            if maybe_addr.is_empty() {
+                out.push(None);
+            } else {
+                match maybe_addr.parse() {
+                    Ok(val) => out.push(Some(val)),
+                    Err(_e) => out.push(None),
+                }
+            }
+        }
+        ValsetResponse {
+            nonce: self.nonce,
+            powers: self.powers,
+            eth_addresses: out,
+        }
+    }
 }
 
 /// the query struct required to get the valset request sent by a specific
@@ -163,15 +212,15 @@ pub struct OptionalTXInfo {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct TXSendResponse {
-    pub code: u128,
-    pub codespace: String,
-    #[serde(deserialize_with = "parse_val")]
-    pub gas_used: u128,
-    #[serde(deserialize_with = "parse_val")]
-    pub gas_wanted: u128,
+    #[serde(deserialize_with = "parse_val_option", default)]
+    pub gas_used: Option<u128>,
+    #[serde(deserialize_with = "parse_val_option", default)]
+    pub gas_wanted: Option<u128>,
     #[serde(deserialize_with = "parse_val")]
     pub height: u128,
-    pub raw_log: String,
+    pub logs: Option<Value>,
+    #[serde(default)]
+    pub raw_log: Value,
     pub txhash: String,
 }
 
@@ -189,6 +238,19 @@ where
 {
     let s: String = String::deserialize(deserializer)?;
     T::from_str(&s).map_err(de::Error::custom)
+}
+
+fn parse_val_option<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: FromStr,
+    T::Err: Display,
+    D: Deserializer<'de>,
+{
+    let s: String = String::deserialize(deserializer)?;
+    match T::from_str(&s) {
+        Ok(val) => Ok(Some(val)),
+        Err(_e) => Ok(None),
+    }
 }
 
 #[cfg(test)]

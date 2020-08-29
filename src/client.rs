@@ -10,6 +10,8 @@ use deep_space::private_key::PrivateKey;
 use deep_space::stdfee::StdFee;
 use deep_space::stdsignmsg::StdSignMsg;
 use deep_space::transaction::Transaction;
+use deep_space::transaction::TransactionSendType;
+use deep_space::utils::bytes_to_hex_str;
 use num256::Uint256;
 use std::sync::Arc;
 use std::time::Duration;
@@ -92,7 +94,7 @@ impl Contact {
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 20_000u64.into(),
+                gas: 70_000u64.into(),
             },
             msgs: vec![Msg::SendMsg(SendMsg {
                 from_address: our_address,
@@ -102,7 +104,9 @@ impl Contact {
             memo: String::new(),
         };
 
-        let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
+        let tx = private_key
+            .sign_std_msg(std_sign_msg, TransactionSendType::Block)
+            .unwrap();
         trace!("{}", json!(tx));
 
         self.jsonrpc_client
@@ -110,7 +114,9 @@ impl Contact {
             .await
     }
 
-    /// Get the latest valset recorded by the peggy module may or may not be complete
+    /// Get the latest valset recorded by the peggy module. If no valset has ever been created
+    /// you will instead get a blank valset at height 0. Any value above this may or may not
+    /// be a complete valset and it's up to the caller to interpret the response.
     pub async fn get_peggy_valset(&self) -> Result<ValsetResponseWrapper, JsonRpcError> {
         let none: Option<bool> = None;
         self.jsonrpc_client
@@ -124,14 +130,19 @@ impl Contact {
         nonce: u128,
     ) -> Result<ValsetResponseWrapper, JsonRpcError> {
         let none: Option<bool> = None;
-        self.jsonrpc_client
+        let ret: Result<ValsetResponseUnparsedWrapper, JsonRpcError> = self
+            .jsonrpc_client
             .request_method(
                 &format!("peggy/valset_request/{}", nonce),
                 none,
                 self.timeout,
                 None,
             )
-            .await
+            .await;
+        match ret {
+            Ok(val) => Ok(val.convert()),
+            Err(e) => Err(e),
+        }
     }
 
     /// get specific confirmations for a given valset, this is useful
@@ -191,17 +202,19 @@ impl Contact {
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 20_000u64.into(),
+                gas: 60_000u64.into(),
             },
             msgs: vec![Msg::SetEthAddressMsg(SetEthAddressMsg {
                 eth_address,
                 validator: our_address,
-                eth_signature: eth_signature.to_bytes().to_vec(),
+                eth_signature: bytes_to_hex_str(&eth_signature.to_bytes()),
             })],
             memo: String::new(),
         };
 
-        let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
+        let tx = private_key
+            .sign_std_msg(std_sign_msg, TransactionSendType::Block)
+            .unwrap();
 
         self.jsonrpc_client
             .request_method("txs", Some(tx), self.timeout, None)
@@ -233,7 +246,7 @@ impl Contact {
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 20_000u64.into(),
+                gas: 70_000u64.into(),
             },
             msgs: vec![Msg::ValsetRequestMsg(ValsetRequestMsg {
                 requester: our_address,
@@ -241,7 +254,9 @@ impl Contact {
             memo: String::new(),
         };
 
-        let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
+        let tx = private_key
+            .sign_std_msg(std_sign_msg, TransactionSendType::Block)
+            .unwrap();
         trace!("{}", json!(tx));
 
         self.jsonrpc_client
@@ -290,7 +305,9 @@ impl Contact {
             memo: String::new(),
         };
 
-        let tx = private_key.sign_std_msg(std_sign_msg).unwrap();
+        let tx = private_key
+            .sign_std_msg(std_sign_msg, TransactionSendType::Block)
+            .unwrap();
 
         self.jsonrpc_client
             .request_method("peggy/valset_confirm", Some(tx), self.timeout, None)
@@ -328,23 +345,24 @@ mod tests {
 
     /// If you run the start-chains.sh script in the peggy repo it will pass
     /// port 1317 on localhost through to the peggycli rest-server which can
-    /// then be used to run this test and debug things quickly. Obviously none
-    /// of the transactions will actually send since the random address won't have
-    /// any tokens. But the rpc server is kind enough to tell you when the tx would
-    /// have sent and there just aren't funds.
+    /// then be used to run this test and debug things quickly. You will need
+    /// to run the following command and copy a phrase so that you actually
+    /// have some coins to send funds
+    /// docker exec -it peggy_test_instance cat /validator-phrases
     #[test]
     #[ignore]
     fn test_endpoints() {
         let mut rng = rand::thread_rng();
         let secret: [u8; 32] = rng.gen();
 
-        let key = PrivateKey::from_secret(&secret);
+        let key = PrivateKey::from_phrase("capital water utility slide daring bar group virtual position excite bridge prefer quiz balcony ability ostrich cash beach indicate south portion prefer seek kind", "").unwrap();
         let eth_private_key = EthPrivateKey::from_slice(&secret).expect("Failed to parse eth key");
-        let contact = Contact::new("http://localhost:1317", Duration::from_secs(5));
+        let contact = Contact::new("http://localhost:1317", Duration::from_secs(30));
+        let token_name = "footoken".to_string();
 
         let res = System::run(move || {
             Arbiter::spawn(async move {
-                let res = test_rpc_calls(contact, key, eth_private_key, address).await;
+                let res = test_rpc_calls(contact, key, eth_private_key, token_name).await;
                 if res.is_err() {
                     println!("{:?}", res);
                     System::current().stop_with_code(1);
@@ -364,89 +382,138 @@ pub async fn test_rpc_calls(
     contact: Contact,
     key: PrivateKey,
     eth_private_key: EthPrivateKey,
+    test_token_name: String,
 ) -> Result<(), String> {
+    let fee = Coin {
+        denom: test_token_name.clone(),
+        amount: 1u32.into(),
+    };
     let address = key
         .to_public_key()
         .expect("Failed to convert to pubkey!")
         .to_address();
 
-    let res = contact.get_latest_block().await;
-    if res.is_err() {
-        return Err(format!("Failed to get latest block {:?}", res));
-    }
+    // start by validating the basics
+    //
+    // get the latest block
+    // get our account info
+    // send a base transaction
 
-    let res = contact.get_account_info(address).await;
-    if res.is_err() {
-        return Err(format!("Failed to get account info {:?}", res));
-    }
+    // let res = contact.get_latest_block().await;
+    // if res.is_err() {
+    //     return Err(format!("Failed to get latest block {:?}", res));
+    // }
 
+    // let res = contact.get_account_info(address).await;
+    // if res.is_err() {
+    //     return Err(format!("Failed to get account info {:?}", res));
+    // }
+
+    // let res = contact
+    //     .create_and_send_transaction(
+    //         Coin {
+    //             denom: test_token_name.clone(),
+    //             amount: 5u32.into(),
+    //         },
+    //         fee.clone(),
+    //         key.to_public_key().unwrap().to_address(),
+    //         key,
+    //         None,
+    //         None,
+    //         None,
+    //     )
+    //     .await;
+    // if res.is_err() {
+    //     return Err(format!("Failed to send tx {:?}", res));
+    // }
+
+    // next we update our eth address so that we can be sure it's present in the resulting valset
+    // request
     let res = contact
-        .create_and_send_transaction(
-            Coin {
-                denom: "test".to_string(),
-                amount: 5u32.into(),
-            },
-            Coin {
-                denom: "test".to_string(),
-                amount: 5u32.into(),
-            },
-            key.to_public_key().unwrap().to_address(),
-            key,
-            None,
-            None,
-            None,
-        )
-        .await;
-    if res.is_err() {
-        return Err(format!("Failed to send tx {:?}", res));
-    }
-
-    let res = contact.get_peggy_valset_request(0).await;
-    if res.is_err() {
-        return Err(format!("Failed to get valset request {:?}", res));
-    }
-
-    let res = contact.get_peggy_valset().await;
-    if res.is_err() {
-        return Err(format!("Failed to get valset {:?}", res));
-    }
-
-    let res = contact.get_peggy_valset_confirmation(0, address).await;
-    if res.is_err() {
-        return Err(format!("Failed to get valset confirmation {:?}", res));
-    }
-
-    let res = contact
-        .send_valset_request(
-            key,
-            Coin {
-                denom: "test".to_string(),
-                amount: 5u32.into(),
-            },
-            None,
-            None,
-            None,
-        )
-        .await;
-    if res.is_err() {
-        return Err(format!("Failed to send valset request {:?}", res));
-    }
-
-    let res = contact
-        .update_peggy_eth_address(
-            eth_private_key,
-            key,
-            Coin {
-                denom: "test".to_string(),
-                amount: 5u32.into(),
-            },
-            None,
-            None,
-            None,
-        )
+        .update_peggy_eth_address(eth_private_key, key, fee.clone(), None, None, None)
         .await;
     if res.is_err() {
         return Err(format!("Failed to update eth address {:?}", res));
     }
+
+    let res = contact.get_peggy_valset_request(1).await;
+    if res.is_ok() {
+        return Err(format!(
+            "Got valset request that should not exist {:?}",
+            res
+        ));
+    }
+
+    // we request a valset be created
+    // and then look at results at two block heights, one where the request was made, one where it
+    // was not
+    let res = contact
+        .send_valset_request(key, fee.clone(), None, None, None)
+        .await;
+    if res.is_err() {
+        return Err(format!("Failed to create valset request {:?}", res));
+    }
+    let valset_request_block = res.unwrap().height;
+
+    let res = contact.get_peggy_valset_request(valset_request_block).await;
+    println!("valset response is {:?}", res);
+    if let Ok(valset) = res {
+        // TODO uncomment once clictx.height is debugged
+        //assert_eq!(valset.height, valset_request_block);
+
+        let addresses = valset.result.eth_addresses;
+        if !addresses.contains(&Some(eth_private_key.to_public_key().unwrap())) {
+            // we successfully submitted our eth address before, we should find it now
+            return Err("Incorrect Valset, does not include submitted eth address".to_string());
+        }
+    } else {
+        return Err("Failed to get valset request that should exist".to_string());
+    }
+    let res = contact.get_peggy_valset_request(valset_request_block).await;
+    println!("valset response is {:?}", res);
+    if let Ok(valset) = res {
+        // TODO uncomment once clictx.height is debugged
+        //assert_eq!(valset.height, valset_request_block);
+
+        let addresses = valset.result.eth_addresses;
+        if !addresses.contains(&Some(eth_private_key.to_public_key().unwrap())) {
+            // we successfully submitted our eth address before, we should find it now
+            return Err("Incorrect Valset, does not include submitted eth address".to_string());
+        }
+    } else {
+        return Err("Failed to get valset request that should exist".to_string());
+    }
+
+    let res = contact
+        .send_valset_request(key, fee.clone(), None, None, None)
+        .await;
+    if res.is_err() {
+        return Err(format!("Failed to create valset request {:?}", res));
+    }
+
+    let res = contact.get_peggy_valset_request(valset_request_block).await;
+    println!("valset response is {:?}", res);
+    if let Ok(valset) = res {
+        // TODO uncomment once clictx.height is debugged
+        //assert_eq!(valset.height, valset_request_block);
+
+        let addresses = valset.result.eth_addresses;
+        if !addresses.contains(&Some(eth_private_key.to_public_key().unwrap())) {
+            // we successfully submitted our eth address before, we should find it now
+            return Err("Incorrect Valset, does not include submitted eth address".to_string());
+        }
+    } else {
+        return Err("Failed to get valset request that should exist".to_string());
+    }
+    // let res = contact.get_peggy_valset().await;
+    // if res.is_err() {
+    //     return Err(format!("Failed to get valset {:?}", res));
+    // }
+
+    // // let res = contact.get_peggy_valset_confirmation(0, address).await;
+    // // if res.is_err() {
+    // //     return Err(format!("Failed to get valset confirmation {:?}", res));
+    // // }
+
     Ok(())
 }
