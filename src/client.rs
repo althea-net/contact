@@ -270,7 +270,7 @@ impl Contact {
         &self,
         eth_private_key: EthPrivateKey,
         fee: Coin,
-        valset: Vec<u8>,
+        valset: ValsetResponse,
         valset_nonce: Uint256,
         private_key: PrivateKey,
         chain_id: Option<String>,
@@ -286,7 +286,8 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
-        let eth_signature = eth_private_key.sign_msg(&valset);
+        // todo replace this with a a proper serialization function
+        let eth_signature = eth_private_key.sign_msg(&json!(valset).to_string().as_bytes());
 
         // todo determine what this operation costs and use that rather than 42
         let std_sign_msg = StdSignMsg {
@@ -394,7 +395,10 @@ pub async fn test_rpc_calls(
         .to_address();
 
     test_basic_calls(&contact, key, test_token_name, fee.clone(), address).await?;
+    // set eth address also tested here, TODO expand to include things like changing
+    // the set eth address
     test_valset_request_calls(&contact, key, eth_private_key, fee.clone()).await?;
+    //test_valset_confirm_calls(&contact, key, eth_private_key, fee.clone()).await?;
 
     Ok(())
 }
