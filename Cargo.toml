@@ -20,4 +20,4 @@ clarity = "0.1"
 [dev-dependencies]
 rand = "0.7"
 actix = "0.9"
-sha3 = "0.8"
+sha3 = "0.9"
