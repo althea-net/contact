@@ -2,7 +2,7 @@ use crate::jsonrpc::client::HTTPClient;
 use crate::jsonrpc::error::JsonRpcError;
 use crate::types::*;
 use crate::utils::maybe_get_optional_tx_info;
-use clarity::PrivateKey as EthPrivateKey;
+use clarity::{abi::encode_tokens, abi::Token, PrivateKey as EthPrivateKey};
 use deep_space::address::Address;
 use deep_space::coin::Coin;
 use deep_space::msg::{Msg, SendMsg, SetEthAddressMsg, ValsetConfirmMsg, ValsetRequestMsg};
@@ -271,8 +271,8 @@ impl Contact {
         eth_private_key: EthPrivateKey,
         fee: Coin,
         valset: ValsetResponse,
-        valset_nonce: Uint256,
         private_key: PrivateKey,
+        peggy_id: String,
         chain_id: Option<String>,
         account_number: Option<u128>,
         sequence: Option<u128>,
@@ -287,7 +287,14 @@ impl Contact {
                 .await?;
 
         // todo replace this with a a proper serialization function
-        let eth_signature = eth_private_key.sign_msg(&json!(valset).to_string().as_bytes());
+        let message = encode_tokens(&[
+            Token::FixedString(peggy_id),
+            Token::FixedString("checkpoint".to_string()),
+            valset.nonce,
+            valset.eth_addresses,
+            valset.powers,
+        ]);
+        let eth_signature = eth_private_key.sign_msg(&message);
 
         // todo determine what this operation costs and use that rather than 42
         let std_sign_msg = StdSignMsg {
