@@ -2,6 +2,7 @@ use crate::jsonrpc::client::HTTPClient;
 use crate::jsonrpc::error::JsonRpcError;
 use crate::types::*;
 use crate::utils::maybe_get_optional_tx_info;
+use clarity::Address as EthAddress;
 use clarity::{abi::encode_tokens, abi::Token, PrivateKey as EthPrivateKey};
 use deep_space::address::Address;
 use deep_space::coin::Coin;
@@ -12,7 +13,6 @@ use deep_space::stdsignmsg::StdSignMsg;
 use deep_space::transaction::Transaction;
 use deep_space::transaction::TransactionSendType;
 use deep_space::utils::bytes_to_hex_str;
-use num256::Uint256;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -290,9 +290,9 @@ impl Contact {
         let message = encode_tokens(&[
             Token::FixedString(peggy_id),
             Token::FixedString("checkpoint".to_string()),
-            valset.nonce,
-            valset.eth_addresses,
-            valset.powers,
+            valset.nonce.clone().into(),
+            normalize_addresses(&valset.eth_addresses).into(),
+            valset.powers.into(),
         ]);
         let eth_signature = eth_private_key.sign_msg(&message);
 
@@ -307,7 +307,7 @@ impl Contact {
             },
             msgs: vec![Msg::ValsetConfirmMsg(ValsetConfirmMsg {
                 validator: our_address,
-                nonce: valset_nonce,
+                nonce: valset.nonce,
                 eth_signature: eth_signature.to_bytes().to_vec(),
             })],
             memo: String::new(),
@@ -321,6 +321,19 @@ impl Contact {
             .request_method("peggy/valset_confirm", Some(tx), self.timeout, None)
             .await
     }
+}
+
+/// Takes an array of Option<EthAddress> and converts to EthAddress by replacing None
+/// values with a zero address
+fn normalize_addresses(input: &[Option<EthAddress>]) -> Vec<EthAddress> {
+    let mut output = Vec::new();
+    for val in input.iter() {
+        match val {
+            Some(a) => output.push(*a),
+            None => output.push(EthAddress::from_slice(&[0; 20]).unwrap()),
+        }
+    }
+    output
 }
 
 #[cfg(test)]
