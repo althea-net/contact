@@ -190,7 +190,7 @@ impl Contact {
 
         let eth_address = eth_private_key.to_public_key().unwrap();
         let eth_signature = eth_private_key.sign_msg(our_address.as_bytes());
-        println!(
+        trace!(
             "sig: {} address: {}",
             clarity::utils::bytes_to_hex_str(&eth_signature.to_bytes()),
             clarity::utils::bytes_to_hex_str(eth_address.as_bytes())
@@ -296,19 +296,18 @@ impl Contact {
         ]);
         let eth_signature = eth_private_key.sign_msg(&message);
 
-        // todo determine what this operation costs and use that rather than 42
         let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
             account_number: tx_info.account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 20_000u64.into(),
+                gas: 500_000u64.into(),
             },
             msgs: vec![Msg::ValsetConfirmMsg(ValsetConfirmMsg {
                 validator: our_address,
                 nonce: valset.nonce,
-                eth_signature: eth_signature.to_bytes().to_vec(),
+                eth_signature: bytes_to_hex_str(&eth_signature.to_bytes()),
             })],
             memo: String::new(),
         };
@@ -318,7 +317,7 @@ impl Contact {
             .unwrap();
 
         self.jsonrpc_client
-            .request_method("peggy/valset_confirm", Some(tx), self.timeout, None)
+            .request_method("txs", Some(tx), self.timeout, None)
             .await
     }
 }
@@ -376,7 +375,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let secret: [u8; 32] = rng.gen();
 
-        let key = PrivateKey::from_phrase("capital water utility slide daring bar group virtual position excite bridge prefer quiz balcony ability ostrich cash beach indicate south portion prefer seek kind", "").unwrap();
+        let key = PrivateKey::from_phrase("crisp deposit spin crunch patient fish caught carpet scare coach fortune clip general clump loan bunker tuition cabin scrap winter width border canoe unique", "").unwrap();
         let eth_private_key = EthPrivateKey::from_slice(&secret).expect("Failed to parse eth key");
         let contact = Contact::new("http://localhost:1317", Duration::from_secs(30));
         let token_name = "footoken".to_string();
@@ -503,8 +502,7 @@ async fn test_valset_request_calls(
     let res = contact.get_peggy_valset_request(valset_request_block).await;
     println!("valset response is {:?}", res);
     if let Ok(valset) = res {
-        // TODO uncomment once clictx.height is debugged
-        //assert_eq!(valset.height, valset_request_block);
+        assert_eq!(valset.height, valset_request_block);
 
         let addresses = valset.result.eth_addresses;
         if !addresses.contains(&Some(eth_private_key.to_public_key().unwrap())) {
@@ -517,38 +515,34 @@ async fn test_valset_request_calls(
     let res = contact.get_peggy_valset_request(valset_request_block).await;
     println!("valset response is {:?}", res);
     if let Ok(valset) = res {
-        // TODO uncomment once clictx.height is debugged
-        //assert_eq!(valset.height, valset_request_block);
+        // this is actually a timing issue, but should be true
+        assert_eq!(valset.height, valset_request_block);
 
-        let addresses = valset.result.eth_addresses;
+        let addresses = valset.result.eth_addresses.clone();
         if !addresses.contains(&Some(eth_private_key.to_public_key().unwrap())) {
             // we successfully submitted our eth address before, we should find it now
             return Err("Incorrect Valset, does not include submitted eth address".to_string());
         }
+
+        println!("Sending valset confirm!");
+        let res = contact
+            .send_valset_confirm(
+                eth_private_key,
+                fee,
+                valset.result,
+                key,
+                "test".to_string(),
+                None,
+                None,
+                None,
+            )
+            .await;
+        println!("{:?}", res);
     } else {
         return Err("Failed to get valset request that should exist".to_string());
     }
 
-    let res = contact
-        .send_valset_request(key, fee.clone(), None, None, None)
-        .await;
-    if res.is_err() {
-        return Err(format!("Failed to create valset request {:?}", res));
-    }
+    // valset confirm
 
-    let res = contact.get_peggy_valset_request(valset_request_block).await;
-    println!("valset response is {:?}", res);
-    if let Ok(valset) = res {
-        // TODO uncomment once clictx.height is debugged
-        //assert_eq!(valset.height, valset_request_block);
-
-        let addresses = valset.result.eth_addresses;
-        if !addresses.contains(&Some(eth_private_key.to_public_key().unwrap())) {
-            // we successfully submitted our eth address before, we should find it now
-            return Err("Incorrect Valset, does not include submitted eth address".to_string());
-        }
-    } else {
-        return Err("Failed to get valset request that should exist".to_string());
-    }
     Ok(())
 }

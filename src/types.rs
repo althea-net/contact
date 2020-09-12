@@ -154,13 +154,28 @@ pub struct ValsetResponseUnparsed {
     #[serde(rename = "EthAddresses")]
     eth_addresses: Vec<String>,
 }
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct ValsetResponseTypeWrapper {
+    #[serde(rename = "type")]
+    response_type: String,
+    value: ValsetResponseUnparsed,
+}
+
 /// Another internal intermediary function to dedal with empty
 /// strings as addresses
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ValsetResponseUnparsedWrapper {
     #[serde(deserialize_with = "parse_val")]
     pub height: u128,
-    pub result: ValsetResponseUnparsed,
+    pub result: ValsetResponseTypeWrapper,
+}
+
+impl ValsetResponseTypeWrapper {
+    pub fn convert(self) -> ValsetResponse {
+        // discard the type info
+        self.value.convert()
+    }
 }
 
 impl ValsetResponseUnparsedWrapper {
