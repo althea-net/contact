@@ -94,7 +94,7 @@ impl Contact {
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 70_000u64.into(),
+                gas: 500_000u64.into(),
             },
             msgs: vec![Msg::SendMsg(SendMsg {
                 from_address: our_address,
@@ -202,7 +202,7 @@ impl Contact {
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 60_000u64.into(),
+                gas: 500_000u64.into(),
             },
             msgs: vec![Msg::SetEthAddressMsg(SetEthAddressMsg {
                 eth_address,
@@ -246,7 +246,7 @@ impl Contact {
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],
-                gas: 70_000u64.into(),
+                gas: 500_000u64.into(),
             },
             msgs: vec![Msg::ValsetRequestMsg(ValsetRequestMsg {
                 requester: our_address,
