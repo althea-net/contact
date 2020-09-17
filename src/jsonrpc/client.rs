@@ -63,12 +63,7 @@ impl HTTPClient {
         };
         let mut res = match res {
             Ok(val) => val,
-            Err(e) => {
-                return Err(JsonRpcError::FailedToSend(format!(
-                    "Failed to send to {} with {:?}",
-                    self.url, e,
-                )))
-            }
+            Err(e) => return Err(JsonRpcError::FailedToSend(e)),
         };
         let status = res.status();
         if !status.is_success() {

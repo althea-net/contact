@@ -1,30 +1,37 @@
 use clarity::Address as EthAddress;
 use deep_space::address::Address;
 use deep_space::coin::Coin;
+use deep_space::public_key::PublicKey;
 use num256::Uint256;
 use serde::de::Deserializer;
 use serde::{de, Deserialize};
 use serde_json::Value;
 use std::{fmt::Display, str::FromStr};
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct CosmosAccountInfoWrapper {
+/// A generic wrapper for Cosmos REST server responses which always
+/// include the height
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ResponseWrapper<T> {
     #[serde(deserialize_with = "parse_val")]
     pub height: u128,
-    pub result: CosmosAccountWrapper,
+    pub result: T,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct CosmosAccountWrapper {
+/// A generic wrapper for Cosmos REST server responses which always
+/// include the struct type
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TypeWrapper<T> {
     #[serde(rename = "type")]
-    pub account_type: String,
-    pub value: CosmosAccountInfo,
+    pub struct_type: String,
+    pub value: T,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CosmosAccountInfo {
-    pub address: String,
-    pub public_key: String,
+    #[serde(deserialize_with = "parse_val_option")]
+    pub address: Option<Address>,
+    #[serde(deserialize_with = "parse_val_option")]
+    pub public_key: Option<PublicKey>,
     pub account_number: u128,
     pub coins: Vec<Coin>,
     pub sequence: u128,
@@ -117,28 +124,19 @@ pub struct BlockSignature {
 /// the response we get when querying for a valset confirmation
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ValsetConfirmResponse {
-    #[serde(rename = "Validator")]
-    pub validator: Option<Address>,
-    #[serde(rename = "Nonce")]
+    #[serde(deserialize_with = "parse_val")]
+    pub validator: Address,
+    #[serde(deserialize_with = "parse_val")]
     pub nonce: Uint256,
-    #[serde(rename = "Signature")]
-    pub eth_signature: Option<Vec<u8>>,
-}
-
-/// wrapper struct for the valset response endpoint which
-/// returns the response wrapped in this struct containing
-/// info about which block the response is in reference to
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ValsetResponseWrapper {
-    pub height: u128,
-    pub result: ValsetResponse,
+    #[serde(deserialize_with = "parse_val")]
+    pub eth_signature: Uint256,
 }
 
 /// a list of validators, powers, and eth addresses at a given block height
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ValsetResponse {
-    pub nonce: Uint256,
-    pub powers: Vec<Uint256>,
+pub struct Valset {
+    pub nonce: u64,
+    pub powers: Vec<u64>,
     pub eth_addresses: Vec<Option<EthAddress>>,
 }
 
@@ -146,50 +144,17 @@ pub struct ValsetResponse {
 /// this version is used by the endpoint to get the data and is then processed
 /// by "convert" into ValsetResponse. Making this struct purely internal
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ValsetResponseUnparsed {
-    #[serde(rename = "Nonce", deserialize_with = "parse_val")]
-    nonce: Uint256,
-    #[serde(rename = "Powers")]
-    powers: Vec<Uint256>,
-    #[serde(rename = "EthAddresses")]
+pub struct ValsetUnparsed {
+    #[serde(deserialize_with = "parse_val")]
+    nonce: u64,
+    powers: Vec<String>,
     eth_addresses: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ValsetResponseTypeWrapper {
-    #[serde(rename = "type")]
-    response_type: String,
-    value: ValsetResponseUnparsed,
-}
-
-/// Another internal intermediary function to dedal with empty
-/// strings as addresses
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ValsetResponseUnparsedWrapper {
-    #[serde(deserialize_with = "parse_val")]
-    pub height: u128,
-    pub result: ValsetResponseTypeWrapper,
-}
-
-impl ValsetResponseTypeWrapper {
-    pub fn convert(self) -> ValsetResponse {
-        // discard the type info
-        self.value.convert()
-    }
-}
-
-impl ValsetResponseUnparsedWrapper {
-    pub fn convert(self) -> ValsetResponseWrapper {
-        ValsetResponseWrapper {
-            height: self.height,
-            result: self.result.convert(),
-        }
-    }
-}
-
-impl ValsetResponseUnparsed {
-    pub fn convert(self) -> ValsetResponse {
+impl ValsetUnparsed {
+    pub fn convert(self) -> Valset {
         let mut out = Vec::new();
+        let mut powers = Vec::new();
         for maybe_addr in self.eth_addresses.iter() {
             if maybe_addr.is_empty() {
                 out.push(None);
@@ -200,9 +165,15 @@ impl ValsetResponseUnparsed {
                 }
             }
         }
-        ValsetResponse {
+        for power in self.powers.iter() {
+            match power.parse() {
+                Ok(val) => powers.push(val),
+                Err(_e) => powers.push(0),
+            }
+        }
+        Valset {
             nonce: self.nonce,
-            powers: self.powers,
+            powers,
             eth_addresses: out,
         }
     }
@@ -290,6 +261,6 @@ mod tests {
         let file =
             read_to_string("test_files/account_info.json").expect("Failed to read test files!");
 
-        let _decoded: CosmosAccountInfoWrapper = serde_json::from_str(&file).unwrap();
+        let _decoded: ResponseWrapper<CosmosAccountInfo> = serde_json::from_str(&file).unwrap();
     }
 }

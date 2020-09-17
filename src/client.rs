@@ -46,7 +46,7 @@ impl Contact {
     pub async fn get_account_info(
         &self,
         address: Address,
-    ) -> Result<CosmosAccountInfoWrapper, JsonRpcError> {
+    ) -> Result<ResponseWrapper<TypeWrapper<CosmosAccountInfo>>, JsonRpcError> {
         let none: Option<bool> = None;
         self.jsonrpc_client
             .request_method(
@@ -117,20 +117,28 @@ impl Contact {
     /// Get the latest valset recorded by the peggy module. If no valset has ever been created
     /// you will instead get a blank valset at height 0. Any value above this may or may not
     /// be a complete valset and it's up to the caller to interpret the response.
-    pub async fn get_peggy_valset(&self) -> Result<ValsetResponseWrapper, JsonRpcError> {
+    pub async fn get_peggy_valset(&self) -> Result<ResponseWrapper<Valset>, JsonRpcError> {
         let none: Option<bool> = None;
-        self.jsonrpc_client
+        let ret: Result<ResponseWrapper<ValsetUnparsed>, JsonRpcError> = self
+            .jsonrpc_client
             .request_method("peggy/current_valset", none, self.timeout, None)
-            .await
+            .await;
+        match ret {
+            Ok(val) => Ok(ResponseWrapper {
+                height: val.height,
+                result: val.result.convert(),
+            }),
+            Err(e) => Err(e),
+        }
     }
 
     /// get the valset for a given nonce (block) height
     pub async fn get_peggy_valset_request(
         &self,
         nonce: u128,
-    ) -> Result<ValsetResponseWrapper, JsonRpcError> {
+    ) -> Result<ResponseWrapper<Valset>, JsonRpcError> {
         let none: Option<bool> = None;
-        let ret: Result<ValsetResponseUnparsedWrapper, JsonRpcError> = self
+        let ret: Result<ResponseWrapper<TypeWrapper<ValsetUnparsed>>, JsonRpcError> = self
             .jsonrpc_client
             .request_method(
                 &format!("peggy/valset_request/{}", nonce),
@@ -140,30 +148,12 @@ impl Contact {
             )
             .await;
         match ret {
-            Ok(val) => Ok(val.convert()),
+            Ok(val) => Ok(ResponseWrapper {
+                height: val.height,
+                result: val.result.value.convert(),
+            }),
             Err(e) => Err(e),
         }
-    }
-
-    /// get specific confirmations for a given valset, this is useful
-    /// when ferrying valsets over to the Cosmos chain
-    pub async fn get_peggy_valset_confirmation(
-        &self,
-        nonce: u128,
-        validator_address: Address,
-    ) -> Result<ValsetConfirmResponse, JsonRpcError> {
-        let payload = QueryValsetConfirm {
-            nonce: nonce.to_string(),
-            address: format!("{}", validator_address),
-        };
-        self.jsonrpc_client
-            .request_method(
-                &"peggy/query_valset_confirm".to_string(),
-                Some(payload),
-                self.timeout,
-                None,
-            )
-            .await
     }
 
     /// Send a transaction updating the eth address for the sending
@@ -270,7 +260,7 @@ impl Contact {
         &self,
         eth_private_key: EthPrivateKey,
         fee: Coin,
-        valset: ValsetResponse,
+        valset: Valset,
         private_key: PrivateKey,
         peggy_id: String,
         chain_id: Option<String>,
@@ -286,11 +276,10 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
-        // todo replace this with a a proper serialization function
         let message = encode_tokens(&[
             Token::FixedString(peggy_id),
             Token::FixedString("checkpoint".to_string()),
-            valset.nonce.clone().into(),
+            valset.nonce.into(),
             normalize_addresses(&valset.eth_addresses).into(),
             valset.powers.into(),
         ]);
@@ -319,6 +308,81 @@ impl Contact {
         self.jsonrpc_client
             .request_method("txs", Some(tx), self.timeout, None)
             .await
+    }
+
+    /// This hits the /pending_valset_requests endpoint and will provide the oldest
+    /// validator set we have not yet signed.
+    pub async fn oldest_unsigned_valset(
+        &self,
+        address: Address,
+    ) -> Result<ResponseWrapper<Valset>, JsonRpcError> {
+        let none: Option<bool> = None;
+        let ret: Result<ResponseWrapper<ValsetUnparsed>, JsonRpcError> = self
+            .jsonrpc_client
+            .request_method(
+                &format!("peggy/pending_valset_requests/{}", address),
+                none,
+                self.timeout,
+                None,
+            )
+            .await;
+        match ret {
+            Ok(val) => Ok(ResponseWrapper {
+                height: val.height,
+                result: val.result.convert(),
+            }),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// this input views the last five valest requests that have been made, useful if you're
+    /// a relayer looking to ferry confirmations
+    pub async fn last_valset_requests(&self) -> Result<ResponseWrapper<Vec<Valset>>, JsonRpcError> {
+        let none: Option<bool> = None;
+        let ret: Result<ResponseWrapper<Vec<ValsetUnparsed>>, JsonRpcError> = self
+            .jsonrpc_client
+            .request_method(
+                &"peggy/valset_requests".to_string(),
+                none,
+                self.timeout,
+                None,
+            )
+            .await;
+
+        match ret {
+            Ok(val) => {
+                let mut converted_values = Vec::new();
+                for item in val.result {
+                    converted_values.push(item.convert());
+                }
+                Ok(ResponseWrapper {
+                    height: val.height,
+                    result: converted_values,
+                })
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// get all valset confirmations for a given nonce
+    pub async fn get_all_valset_confirms(
+        &self,
+        nonce: u64,
+    ) -> Result<ValsetConfirmResponse, JsonRpcError> {
+        let none: Option<bool> = None;
+        let ret: Result<ValsetConfirmResponse, JsonRpcError> = self
+            .jsonrpc_client
+            .request_method(
+                &format!("peggy/valset_confirm/{}", nonce),
+                none,
+                self.timeout,
+                None,
+            )
+            .await;
+        match ret {
+            Ok(val) => Ok(val),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -375,7 +439,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let secret: [u8; 32] = rng.gen();
 
-        let key = PrivateKey::from_phrase("crisp deposit spin crunch patient fish caught carpet scare coach fortune clip general clump loan bunker tuition cabin scrap winter width border canoe unique", "").unwrap();
+        let key = PrivateKey::from_phrase("deal eternal voice label table flight raw pear bless glove marine letter paddle fringe modify just carbon soda maid hybrid chronic patch phone mixture", "").unwrap();
         let eth_private_key = EthPrivateKey::from_slice(&secret).expect("Failed to parse eth key");
         let contact = Contact::new("http://localhost:1317", Duration::from_secs(30));
         let token_name = "footoken".to_string();
@@ -525,6 +589,8 @@ async fn test_valset_request_calls(
         }
 
         println!("Sending valset confirm!");
+        // issue here, we can't actually test valset confirm because all the validators need
+        // to have submitted an Ethereum address first.
         let res = contact
             .send_valset_confirm(
                 eth_private_key,
@@ -537,7 +603,6 @@ async fn test_valset_request_calls(
                 None,
             )
             .await;
-        println!("{:?}", res);
     } else {
         return Err("Failed to get valset request that should exist".to_string());
     }

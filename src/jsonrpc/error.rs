@@ -1,3 +1,4 @@
+use actix_web::client::SendRequestError as ActixError;
 use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -6,7 +7,7 @@ use std::fmt::Result;
 #[derive(Debug)]
 pub enum JsonRpcError {
     BadResponse(String),
-    FailedToSend(String),
+    FailedToSend(ActixError),
     ResponseError {
         code: i64,
         message: String,
