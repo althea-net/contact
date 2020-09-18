@@ -295,7 +295,7 @@ impl Contact {
             },
             msgs: vec![Msg::ValsetConfirmMsg(ValsetConfirmMsg {
                 validator: our_address,
-                nonce: valset.nonce,
+                nonce: valset.nonce.into(),
                 eth_signature: bytes_to_hex_str(&eth_signature.to_bytes()),
             })],
             memo: String::new(),
@@ -439,7 +439,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let secret: [u8; 32] = rng.gen();
 
-        let key = PrivateKey::from_phrase("deal eternal voice label table flight raw pear bless glove marine letter paddle fringe modify just carbon soda maid hybrid chronic patch phone mixture", "").unwrap();
+        let key = PrivateKey::from_phrase("dog infant run timber spin chair owner craft wet insane tortoise hover labor letter doll funny mail piece arch depth unveil goddess flock crazy", "").unwrap();
         let eth_private_key = EthPrivateKey::from_slice(&secret).expect("Failed to parse eth key");
         let contact = Contact::new("http://localhost:1317", Duration::from_secs(30));
         let token_name = "footoken".to_string();
@@ -603,6 +603,9 @@ async fn test_valset_request_calls(
                 None,
             )
             .await;
+        if res.is_err() {
+            return Err(format!("Failed to send valset confirm {:?}", res));
+        }
     } else {
         return Err("Failed to get valset request that should exist".to_string());
     }
