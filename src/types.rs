@@ -1,4 +1,5 @@
 use clarity::Address as EthAddress;
+use clarity::Signature as EthSignature;
 use deep_space::address::Address;
 use deep_space::coin::Coin;
 use deep_space::public_key::PublicKey;
@@ -128,8 +129,8 @@ pub struct ValsetConfirmResponse {
     pub validator: Address,
     #[serde(deserialize_with = "parse_val")]
     pub nonce: Uint256,
-    #[serde(deserialize_with = "parse_val")]
-    pub eth_signature: Uint256,
+    #[serde(deserialize_with = "parse_val", rename = "signature")]
+    pub eth_signature: EthSignature,
 }
 
 /// a list of validators, powers, and eth addresses at a given block height
