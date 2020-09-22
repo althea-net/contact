@@ -237,7 +237,7 @@ impl Contact {
             Token::FixedString(peggy_id),
             Token::FixedString("checkpoint".to_string()),
             valset.nonce.into(),
-            normalize_addresses(&valset.eth_addresses).into(),
+            filter_empty_addresses(&valset.eth_addresses)?.into(),
             valset.powers.into(),
         ]);
         let eth_signature = eth_private_key.sign_msg(&message);
@@ -266,15 +266,21 @@ impl Contact {
     }
 }
 
-/// Takes an array of Option<EthAddress> and converts to EthAddress by replacing None
-/// values with a zero address
-fn normalize_addresses(input: &[Option<EthAddress>]) -> Vec<EthAddress> {
+/// Takes an array of Option<EthAddress> and converts to EthAddress erroring when
+/// an None is found
+pub fn filter_empty_addresses(
+    input: &[Option<EthAddress>],
+) -> Result<Vec<EthAddress>, JsonRpcError> {
     let mut output = Vec::new();
     for val in input.iter() {
         match val {
             Some(a) => output.push(*a),
-            None => output.push(EthAddress::from_slice(&[0; 20]).unwrap()),
+            None => {
+                return Err(JsonRpcError::BadInput(
+                    "All Eth Addresses must be set".to_string(),
+                ))
+            }
         }
     }
-    output
+    Ok(output)
 }

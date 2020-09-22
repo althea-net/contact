@@ -13,12 +13,14 @@ pub enum JsonRpcError {
         message: String,
         data: String,
     },
+    BadInput(String),
 }
 
 impl Display for JsonRpcError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             JsonRpcError::BadResponse(val) => write!(f, "JsonRPC bad response {}", val),
+            JsonRpcError::BadInput(val) => write!(f, "JsonRPC bad input {}", val),
             JsonRpcError::FailedToSend(val) => write!(f, "JsonRPC Failed to send {}", val),
             JsonRpcError::ResponseError {
                 code,
