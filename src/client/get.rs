@@ -129,9 +129,9 @@ impl Contact {
     pub async fn get_all_valset_confirms(
         &self,
         nonce: u64,
-    ) -> Result<ValsetConfirmResponse, JsonRpcError> {
+    ) -> Result<ResponseWrapper<Vec<ValsetConfirmResponse>>, JsonRpcError> {
         let none: Option<bool> = None;
-        let ret: Result<ValsetConfirmResponse, JsonRpcError> = self
+        let ret: Result<ResponseWrapper<Vec<ValsetConfirmResponse>>, JsonRpcError> = self
             .jsonrpc_client
             .request_method(
                 &format!("peggy/valset_confirm/{}", nonce),
