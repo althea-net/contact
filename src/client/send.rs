@@ -1,7 +1,11 @@
+use std::time::Instant;
+
 use crate::client::Contact;
 use crate::jsonrpc::error::JsonRpcError;
 use crate::types::*;
 use crate::utils::maybe_get_optional_tx_info;
+use actix_web::client::ConnectError;
+use actix_web::client::SendRequestError;
 use clarity::Address as EthAddress;
 use clarity::{abi::encode_tokens, abi::Token, PrivateKey as EthPrivateKey};
 use deep_space::address::Address;
@@ -13,6 +17,7 @@ use deep_space::stdsignmsg::StdSignMsg;
 use deep_space::transaction::Transaction;
 use deep_space::transaction::TransactionSendType;
 use deep_space::utils::bytes_to_hex_str;
+use serde::Deserialize;
 
 impl Contact {
     /// The advanced version of create_and_send transaction that expects you to
@@ -21,6 +26,49 @@ impl Contact {
         self.jsonrpc_client
             .request_method("txs", Some(msg), self.timeout, None)
             .await
+    }
+
+    /// When a transaction is in 'block' mode it actually asynchronously waits to go into the blockchain
+    /// before returning. This is very useful in many contexts but is somewhat limited by the fact that
+    /// nodes by default are configured to time out after 10 seconds. The caller of Contact of course
+    /// expects the timeout they provide to be honored. This routine allows us to do that, retrying
+    /// as needed until we reach the specific timeout allowed.
+    async fn retry_on_block<T: 'static + for<'de> Deserialize<'de> + std::fmt::Debug>(
+        &self,
+        tx: Transaction,
+    ) -> Result<T, JsonRpcError> {
+        if let Transaction::Block(..) = tx {
+            let start = Instant::now();
+            let mut res = self
+                .jsonrpc_client
+                .request_method("txs", Some(tx.clone()), self.timeout, None)
+                .await;
+            while let Err(JsonRpcError::FailedToSend(SendRequestError::Connect(
+                ConnectError::Disconnected,
+            ))) = res
+            {
+                // since we can't combine logical statements and destructuring with let bindings
+                // this will have to do
+                if Instant::now() - start > self.timeout {
+                    break;
+                }
+                // subtract two durations to get how much time we have left until
+                // the actual user provided timeout. This will be passed as the call timeout
+                // we must consider the case where the remote server does not have a short timeout
+                // but our call fails for some other reason and we then get stuck waiting beyond
+                // the expected timeout duration.
+                let time_left = self.timeout - (Instant::now() - start);
+                res = self
+                    .jsonrpc_client
+                    .request_method("txs", Some(tx.clone()), time_left, None)
+                    .await;
+            }
+            res
+        } else {
+            self.jsonrpc_client
+                .request_method("txs", Some(tx.clone()), self.timeout, None)
+                .await
+        }
     }
 
     /// The hand holding version of send transaction that does it all for you
@@ -66,9 +114,7 @@ impl Contact {
             .unwrap();
         trace!("{}", json!(tx));
 
-        self.jsonrpc_client
-            .request_method("txs", Some(tx), self.timeout, None)
-            .await
+        self.retry_on_block(tx).await
     }
 
     /// Send a transaction updating the eth address for the sending
@@ -121,9 +167,7 @@ impl Contact {
             .sign_std_msg(std_sign_msg, TransactionSendType::Block)
             .unwrap();
 
-        self.jsonrpc_client
-            .request_method("txs", Some(tx), self.timeout, None)
-            .await
+        self.retry_on_block(tx).await
     }
 
     /// Send a transaction requesting that a valset be formed for a given block
@@ -164,9 +208,7 @@ impl Contact {
             .unwrap();
         trace!("{}", json!(tx));
 
-        self.jsonrpc_client
-            .request_method("txs", Some(tx), self.timeout, None)
-            .await
+        self.retry_on_block(tx).await
     }
 
     /// Send in a confirmation for a specific validator set for a specific block height
@@ -220,9 +262,7 @@ impl Contact {
             .sign_std_msg(std_sign_msg, TransactionSendType::Block)
             .unwrap();
 
-        self.jsonrpc_client
-            .request_method("txs", Some(tx), self.timeout, None)
-            .await
+        self.retry_on_block(tx).await
     }
 }
 
