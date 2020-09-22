@@ -76,7 +76,7 @@ impl Contact {
         address: Address,
     ) -> Result<ResponseWrapper<Valset>, JsonRpcError> {
         let none: Option<bool> = None;
-        let ret: Result<ResponseWrapper<ValsetUnparsed>, JsonRpcError> = self
+        let ret: Result<ResponseWrapper<TypeWrapper<ValsetUnparsed>>, JsonRpcError> = self
             .jsonrpc_client
             .request_method(
                 &format!("peggy/pending_valset_requests/{}", address),
@@ -88,7 +88,7 @@ impl Contact {
         match ret {
             Ok(val) => Ok(ResponseWrapper {
                 height: val.height,
-                result: val.result.convert(),
+                result: val.result.value.convert(),
             }),
             Err(e) => Err(e),
         }
