@@ -1,24 +1,23 @@
 [package]
 name = "contact"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Justin Kilpatrick <justin@althea.net>"]
 edition = "2018"
 
 
 [dependencies]
-deep_space = {git = "https://github.com/althea-net/deep_space", rev = "0fcd391efbaab488e00089a005b3ed25d169e94e", features = ["peggy", "key_import"]}
-# deep_space = {version = "0.1", features = ["peggy", "key_import"]}
+deep_space = {version = "0.2", features = ["peggy", "key_import"]}
 # deep_space = {path = "../deep_space"}
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-actix-web = {version = "2.0", features=["openssl"]}
+actix-web = {version = "3.0", features=["openssl"]}
 log = "0.4"
-num256 = "0.2"
-clarity = "0.1"
+num256 = "0.3"
+clarity = "0.2"
 # clarity = {path = "../clarity"}
 
 [dev-dependencies]
 rand = "0.7"
-actix = "0.9"
+actix = "0.10"
 sha3 = "0.9"
