@@ -40,8 +40,8 @@ pub struct CosmosAccountInfo {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BlockId {
-    hash: String,
-    parts: BlockParts,
+    pub hash: String,
+    pub parts: BlockParts,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -106,11 +106,11 @@ pub struct BlockEvidence {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct LastCommit {
     #[serde(deserialize_with = "parse_val")]
-    height: u128,
+    pub height: u128,
     #[serde(deserialize_with = "parse_val")]
-    round: u128,
-    block_id: BlockId,
-    signatures: Vec<BlockSignature>,
+    pub round: u128,
+    pub block_id: BlockId,
+    pub signatures: Vec<BlockSignature>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
