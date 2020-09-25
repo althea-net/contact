@@ -140,7 +140,7 @@ impl Contact {
         trace!("got optional tx info");
 
         let eth_address = eth_private_key.to_public_key().unwrap();
-        let eth_signature = eth_private_key.sign_msg(our_address.as_bytes());
+        let eth_signature = eth_private_key.sign_ethereum_msg(our_address.as_bytes());
         trace!(
             "sig: {} address: {}",
             clarity::utils::bytes_to_hex_str(&eth_signature.to_bytes()),
@@ -240,7 +240,7 @@ impl Contact {
             filter_empty_addresses(&valset.eth_addresses)?.into(),
             valset.powers.into(),
         ]);
-        let eth_signature = eth_private_key.sign_msg(&message);
+        let eth_signature = eth_private_key.sign_ethereum_msg(&message);
 
         let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,

@@ -47,7 +47,7 @@ mod tests {
         let eth_private_key = EthPrivateKey::from_slice(&secret).expect("Failed to parse eth key");
         let eth_address = eth_private_key.to_public_key().unwrap();
         let msg = eth_address.as_bytes();
-        let eth_signature = eth_private_key.sign_msg(msg);
+        let eth_signature = eth_private_key.sign_ethereum_msg(msg);
         let digest = Keccak256::digest(msg);
         trace!(
             "sig: 0x{} hash: 0x{} address: 0x{}",
