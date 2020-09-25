@@ -49,7 +49,7 @@ mod tests {
         let msg = eth_address.as_bytes();
         let eth_signature = eth_private_key.sign_msg(msg);
         let digest = Keccak256::digest(msg);
-        println!(
+        trace!(
             "sig: 0x{} hash: 0x{} address: 0x{}",
             clarity::utils::bytes_to_hex_str(&eth_signature.to_bytes()),
             clarity::utils::bytes_to_hex_str(&digest),
@@ -218,7 +218,6 @@ async fn test_valset_request_calls(
             return Err("Incorrect Valset, does not include submitted eth address".to_string());
         }
 
-        println!("Sending valset confirm!");
         // issue here, we can't actually test valset confirm because all the validators need
         // to have submitted an Ethereum address first.
         let res = contact

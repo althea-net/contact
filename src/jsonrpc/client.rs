@@ -32,7 +32,7 @@ impl HTTPClient {
         // T: std::fmt::Debug,
         R: std::fmt::Debug,
     {
-        println!(
+        trace!(
             "About to make contact request to {} with payload {}",
             method,
             json!(params)
@@ -78,7 +78,7 @@ impl HTTPClient {
         // much harder to debug since there's no way to actually display serde value
         // you're looking for.
         let json_value: Result<Value, _> = res.json().limit(limit).await;
-        println!("got Cosmos JSONRPC response {:#?}", json_value);
+        trace!("got Cosmos JSONRPC response {:#?}", json_value);
         let json: Value = match json_value {
             Ok(val) => val,
             Err(e) => return Err(JsonRpcError::BadResponse(e.to_string())),
