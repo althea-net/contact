@@ -44,10 +44,10 @@ mod tests {
     #[ignore]
     fn test_endpoints() {
         let key = PrivateKey::from_phrase("speed drastic talent solution divert cheap caution road dance sign empty aisle gift kangaroo inherit build fury general cup skirt staff present sponsor marriage", "").unwrap();
-        let contact = Contact::new("http://localhost:1317", Duration::from_secs(30));
         let token_name = "footoken".to_string();
 
         let res = System::run(move || {
+            let contact = Contact::new("http://localhost:1317", Duration::from_secs(30));
             Arbiter::spawn(async move {
                 let res = test_rpc_calls(contact, key, token_name).await;
                 if res.is_err() {
