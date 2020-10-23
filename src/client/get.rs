@@ -4,7 +4,7 @@ use crate::types::*;
 use deep_space::address::Address;
 
 impl Contact {
-    pub async fn get_latest_number(&self) -> Result<u128, JsonRpcError> {
+    pub async fn get_latest_block_number(&self) -> Result<u128, JsonRpcError> {
         let none: Option<bool> = None;
         let res: Result<LatestBlockEndpointResponse, JsonRpcError> = self
             .jsonrpc_client
