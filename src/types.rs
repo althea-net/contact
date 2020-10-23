@@ -188,6 +188,7 @@ mod tests {
         let file =
             read_to_string("test_files/account_info.json").expect("Failed to read test files!");
 
-        let _decoded: ResponseWrapper<CosmosAccountInfo> = serde_json::from_str(&file).unwrap();
+        let _decoded: ResponseWrapper<TypeWrapper<CosmosAccountInfo>> =
+            serde_json::from_str(&file).unwrap();
     }
 }
