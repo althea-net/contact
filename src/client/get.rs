@@ -39,4 +39,11 @@ impl Contact {
             )
             .await
     }
+
+    pub async fn get_tx_by_hash(&self, txhash: &str) -> Result<TXSendResponse, JsonRpcError> {
+        let none: Option<bool> = None;
+        self.jsonrpc_client
+            .request_method(&format!("txs/{}", txhash), none, self.timeout, None)
+            .await
+    }
 }
