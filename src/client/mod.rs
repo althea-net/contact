@@ -1,4 +1,4 @@
-use crate::jsonrpc::client::HTTPClient;
+use crate::jsonrpc::{client::HTTPClient, error::JsonRpcError};
 use deep_space::address::Address;
 use deep_space::coin::Coin;
 use deep_space::private_key::PrivateKey;
@@ -43,7 +43,8 @@ mod tests {
     #[test]
     #[ignore]
     fn test_endpoints() {
-        let key = PrivateKey::from_phrase("speed drastic talent solution divert cheap caution road dance sign empty aisle gift kangaroo inherit build fury general cup skirt staff present sponsor marriage", "").unwrap();
+        env_logger::init();
+        let key = PrivateKey::from_phrase("cat matter what sense year theory wreck bicycle hobby turtle repeat wrap express crowd memory jewel clerk stool spot hungry frog expire club issue", "").unwrap();
         let token_name = "footoken".to_string();
 
         let res = System::run(move || {
@@ -103,8 +104,15 @@ async fn test_basic_calls(
     }
 
     let res = contact.get_account_info(address).await;
+    match res {
+        Ok(_) => {}
+        Err(JsonRpcError::NoToken) => {}
+        Err(e) => return Err(format!("Failed to get account info {:?}", e)),
+    }
+
+    let res = contact.get_balances(address).await;
     if res.is_err() {
-        return Err(format!("Failed to get account info {:?}", res));
+        return Err(format!("Failed to get balances {:?}", res));
     }
 
     let res = contact

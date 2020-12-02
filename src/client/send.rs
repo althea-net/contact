@@ -98,9 +98,16 @@ impl Contact {
             maybe_get_optional_tx_info(our_address, chain_id, account_number, sequence, &self)
                 .await?;
 
+        let account_number = match tx_info.account_number {
+            Some(acc_num) => acc_num,
+            None => 0,
+        };
+
         let std_sign_msg = StdSignMsg {
             chain_id: tx_info.chain_id,
-            account_number: tx_info.account_number,
+            // this is not actually used in signing so we make
+            // a best effort to provide it
+            account_number,
             sequence: tx_info.sequence,
             fee: StdFee {
                 amount: vec![fee],

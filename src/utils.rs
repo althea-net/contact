@@ -17,9 +17,15 @@ pub async fn maybe_get_optional_tx_info(
     // if the user provides values use those, otherwise fallback to retrieving them
     let (account_number, sequence) = if account_number.is_none() || sequence.is_none() {
         let info = client.get_account_info(our_address).await?;
-        (info.result.value.account_number, info.result.value.sequence)
+        if info.result.value.is_none() {
+            return Err(JsonRpcError::NoToken);
+        }
+        (
+            info.result.value.clone().unwrap().account_number,
+            info.result.value.unwrap().sequence,
+        )
     } else {
-        (account_number.unwrap(), sequence.unwrap())
+        (account_number, sequence.unwrap())
     };
 
     // likewise with the chain id, if there's a user provided value

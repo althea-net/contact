@@ -85,7 +85,7 @@ impl HTTPClient {
         };
         let data: R = match from_value(json) {
             Ok(val) => val,
-            Err(e) => return Err(JsonRpcError::BadResponse(e.to_string())),
+            Err(e) => return Err(JsonRpcError::BadStruct(e.to_string())),
         };
 
         Ok(data)

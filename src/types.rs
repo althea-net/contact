@@ -1,5 +1,4 @@
 use deep_space::address::Address;
-use deep_space::coin::Coin;
 use deep_space::public_key::PublicKey;
 use serde::de::Deserializer;
 use serde::{de, Deserialize};
@@ -24,15 +23,29 @@ pub struct TypeWrapper<T> {
     pub value: T,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct PubKeyWrapper {
+    #[serde(rename = "type")]
+    key_type: String,
+    #[serde(deserialize_with = "parse_val")]
+    value: PublicKey,
+}
+
+fn default_account_number() -> Option<u128> {
+    None
+}
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CosmosAccountInfo {
-    #[serde(deserialize_with = "parse_val_option")]
-    pub address: Option<Address>,
-    #[serde(deserialize_with = "parse_val_option")]
-    pub public_key: Option<PublicKey>,
-    pub account_number: u128,
-    pub coins: Vec<Coin>,
+    #[serde(deserialize_with = "parse_val")]
+    pub address: Address,
+    pub public_key: PubKeyWrapper,
+    #[serde(deserialize_with = "parse_val")]
     pub sequence: u128,
+    #[serde(
+        deserialize_with = "parse_val_option",
+        default = "default_account_number"
+    )]
+    pub account_number: Option<u128>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -43,7 +56,7 @@ pub struct BlockId {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BlockParts {
-    pub total: String,
+    pub total: u64,
     pub hash: String,
 }
 
@@ -69,8 +82,6 @@ pub struct BlockHeader {
 pub struct BlockVersion {
     #[serde(deserialize_with = "parse_val")]
     pub block: u128,
-    #[serde(deserialize_with = "parse_val")]
-    pub app: u128,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -101,7 +112,6 @@ pub struct BlockEvidence {
 pub struct LastCommit {
     #[serde(deserialize_with = "parse_val")]
     pub height: u128,
-    #[serde(deserialize_with = "parse_val")]
     pub round: u128,
     pub block_id: BlockId,
     pub signatures: Vec<BlockSignature>,
@@ -119,7 +129,7 @@ pub struct BlockSignature {
 #[derive(Debug, Clone)]
 pub struct OptionalTXInfo {
     pub chain_id: String,
-    pub account_number: u128,
+    pub account_number: Option<u128>,
     pub sequence: u128,
 }
 
@@ -165,6 +175,10 @@ where
         Err(_e) => Ok(None),
     }
 }
+
+/// A blank struct, used to parse blank responses
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct Blank {}
 
 #[cfg(test)]
 mod tests {

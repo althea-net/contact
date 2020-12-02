@@ -1,7 +1,7 @@
 use crate::client::Contact;
 use crate::jsonrpc::error::JsonRpcError;
 use crate::types::*;
-use deep_space::address::Address;
+use deep_space::{address::Address, coin::Coin};
 
 impl Contact {
     pub async fn get_latest_block_number(&self) -> Result<u128, JsonRpcError> {
@@ -25,25 +25,64 @@ impl Contact {
     }
 
     /// Gets account info for the provided Cosmos account using the accounts endpoint
+    /// accounts do not have any info if they have no tokens or are otherwise never seen
+    /// before an Ok(None) result indicates this
     pub async fn get_account_info(
         &self,
         address: Address,
-    ) -> Result<ResponseWrapper<TypeWrapper<CosmosAccountInfo>>, JsonRpcError> {
+    ) -> Result<ResponseWrapper<TypeWrapper<Option<CosmosAccountInfo>>>, JsonRpcError> {
         let none: Option<bool> = None;
-        self.jsonrpc_client
+        let res = self
+            .jsonrpc_client
             .request_method(
                 &format!("auth/accounts/{}", address),
                 none,
                 self.timeout,
                 None,
             )
-            .await
+            .await;
+        if let Err(JsonRpcError::BadStruct(_)) = res {
+            let res: Result<ResponseWrapper<TypeWrapper<Blank>>, JsonRpcError> = self
+                .jsonrpc_client
+                .request_method(
+                    &format!("auth/accounts/{}", address),
+                    none,
+                    self.timeout,
+                    None,
+                )
+                .await;
+            let res = res?;
+            Ok(ResponseWrapper {
+                height: res.height,
+                result: TypeWrapper {
+                    struct_type: res.result.struct_type,
+                    value: None,
+                },
+            })
+        } else {
+            res
+        }
     }
 
     pub async fn get_tx_by_hash(&self, txhash: &str) -> Result<TXSendResponse, JsonRpcError> {
         let none: Option<bool> = None;
         self.jsonrpc_client
             .request_method(&format!("txs/{}", txhash), none, self.timeout, None)
+            .await
+    }
+
+    pub async fn get_balances(
+        &self,
+        address: Address,
+    ) -> Result<ResponseWrapper<Vec<Coin>>, JsonRpcError> {
+        let none: Option<bool> = None;
+        self.jsonrpc_client
+            .request_method(
+                &format!("bank/balances/{}", address),
+                none,
+                self.timeout,
+                None,
+            )
             .await
     }
 }
