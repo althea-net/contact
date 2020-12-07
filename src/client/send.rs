@@ -52,7 +52,8 @@ impl Contact {
             while let Err(JsonRpcError::FailedToSend(SendRequestError::Connect(
                 ConnectError::Disconnected,
             )))
-            | Err(JsonRpcError::BadResponse(_)) = res
+            | Err(JsonRpcError::BadResponse(_))
+            | Err(JsonRpcError::BadStruct(_)) = res
             {
                 // since we can't combine logical statements and destructuring with let bindings
                 // this will have to do
