@@ -48,9 +48,11 @@ impl Contact {
                 .jsonrpc_client
                 .request_method("txs", Some(tx.clone()), self.timeout, None)
                 .await;
+            trace!("Sending tx got {:?}", res);
             while let Err(JsonRpcError::FailedToSend(SendRequestError::Connect(
                 ConnectError::Disconnected,
-            ))) = res
+            )))
+            | Err(JsonRpcError::BadResponse(_)) = res
             {
                 // since we can't combine logical statements and destructuring with let bindings
                 // this will have to do
