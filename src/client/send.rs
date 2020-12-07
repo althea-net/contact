@@ -85,8 +85,8 @@ impl Contact {
         destination: Address,
         private_key: PrivateKey,
         chain_id: Option<String>,
-        account_number: Option<u128>,
-        sequence: Option<u128>,
+        account_number: Option<u64>,
+        sequence: Option<u64>,
     ) -> Result<TXSendResponse, JsonRpcError> {
         trace!("Creating transaction");
         let our_address = private_key

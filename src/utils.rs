@@ -10,8 +10,8 @@ use deep_space::address::Address;
 pub async fn maybe_get_optional_tx_info(
     our_address: Address,
     chain_id: Option<String>,
-    account_number: Option<u128>,
-    sequence: Option<u128>,
+    account_number: Option<u64>,
+    sequence: Option<u64>,
     client: &Contact,
 ) -> Result<OptionalTXInfo, JsonRpcError> {
     // if the user provides values use those, otherwise fallback to retrieving them

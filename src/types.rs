@@ -10,7 +10,7 @@ use std::{fmt::Display, str::FromStr};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ResponseWrapper<T> {
     #[serde(deserialize_with = "parse_val")]
-    pub height: u128,
+    pub height: u64,
     pub result: T,
 }
 
@@ -31,7 +31,7 @@ pub struct PubKeyWrapper {
     value: PublicKey,
 }
 
-fn default_account_number() -> Option<u128> {
+fn default_account_number() -> Option<u64> {
     None
 }
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -40,12 +40,12 @@ pub struct CosmosAccountInfo {
     pub address: Address,
     pub public_key: PubKeyWrapper,
     #[serde(deserialize_with = "parse_val")]
-    pub sequence: u128,
+    pub sequence: u64,
     #[serde(
         deserialize_with = "parse_val_option",
         default = "default_account_number"
     )]
-    pub account_number: Option<u128>,
+    pub account_number: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -81,7 +81,7 @@ pub struct BlockHeader {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BlockVersion {
     #[serde(deserialize_with = "parse_val")]
-    pub block: u128,
+    pub block: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -111,15 +111,15 @@ pub struct BlockEvidence {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct LastCommit {
     #[serde(deserialize_with = "parse_val")]
-    pub height: u128,
-    pub round: u128,
+    pub height: u64,
+    pub round: u64,
     pub block_id: BlockId,
     pub signatures: Vec<BlockSignature>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BlockSignature {
-    pub block_id_flag: u128,
+    pub block_id_flag: u64,
     #[serde(deserialize_with = "parse_val")]
     pub validator_address: Address,
     pub timestamp: String,
@@ -129,18 +129,18 @@ pub struct BlockSignature {
 #[derive(Debug, Clone)]
 pub struct OptionalTXInfo {
     pub chain_id: String,
-    pub account_number: Option<u128>,
-    pub sequence: u128,
+    pub account_number: Option<u64>,
+    pub sequence: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct TXSendResponse {
     #[serde(deserialize_with = "parse_val_option", default)]
-    pub gas_used: Option<u128>,
+    pub gas_used: Option<u64>,
     #[serde(deserialize_with = "parse_val_option", default)]
-    pub gas_wanted: Option<u128>,
+    pub gas_wanted: Option<u64>,
     #[serde(deserialize_with = "parse_val")]
-    pub height: u128,
+    pub height: u64,
     pub logs: Option<Value>,
     #[serde(default)]
     pub raw_log: Value,
