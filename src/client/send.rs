@@ -14,9 +14,10 @@ use deep_space::transaction::Transaction;
 use deep_space::transaction::TransactionSendType;
 use serde::Deserialize;
 use serde::Serialize;
-use std::clone::Clone;
 use std::fmt::Debug;
 use std::time::Instant;
+use std::{clone::Clone, time::Duration};
+use tokio::time::delay_for;
 
 impl Contact {
     /// The advanced version of create_and_send transaction that expects you to
@@ -66,6 +67,7 @@ impl Contact {
                 // but our call fails for some other reason and we then get stuck waiting beyond
                 // the expected timeout duration.
                 let time_left = self.timeout - (Instant::now() - start);
+                delay_for(Duration::from_secs(1)).await;
                 res = self
                     .jsonrpc_client
                     .request_method("txs", Some(tx.clone()), time_left, None)
