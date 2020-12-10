@@ -31,21 +31,18 @@ pub struct PubKeyWrapper {
     value: PublicKey,
 }
 
-fn default_account_number() -> Option<u64> {
-    None
+fn default_account_number() -> u64 {
+    0
 }
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CosmosAccountInfo {
     #[serde(deserialize_with = "parse_val")]
     pub address: Address,
-    pub public_key: PubKeyWrapper,
-    #[serde(deserialize_with = "parse_val")]
+    pub public_key: Option<PubKeyWrapper>,
+    #[serde(deserialize_with = "parse_val", default = "default_account_number")]
     pub sequence: u64,
-    #[serde(
-        deserialize_with = "parse_val_option",
-        default = "default_account_number"
-    )]
-    pub account_number: Option<u64>,
+    #[serde(default = "default_account_number", deserialize_with = "parse_val")]
+    pub account_number: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -129,7 +126,7 @@ pub struct BlockSignature {
 #[derive(Debug, Clone)]
 pub struct OptionalTXInfo {
     pub chain_id: String,
-    pub account_number: Option<u64>,
+    pub account_number: u64,
     pub sequence: u64,
 }
 
@@ -186,21 +183,15 @@ mod tests {
     use std::fs::read_to_string;
 
     #[test]
-    fn decode_block_summary() {
-        let file =
-            read_to_string("test_files/block_endpoint.json").expect("Failed to read test files!");
-        let _decoded: LatestBlockEndpointResponse = serde_json::from_str(&file).unwrap();
-
-        let file =
-            read_to_string("test_files/block_endpoint_2.json").expect("Failed to read test files!");
-
-        let _decoded: LatestBlockEndpointResponse = serde_json::from_str(&file).unwrap();
-    }
-
-    #[test]
     fn decode_account_info() {
-        let file =
-            read_to_string("test_files/account_info.json").expect("Failed to read test files!");
+        let file = read_to_string("test_files/account_info_active.json")
+            .expect("Failed to read test files!");
+
+        let _decoded: ResponseWrapper<TypeWrapper<CosmosAccountInfo>> =
+            serde_json::from_str(&file).unwrap();
+
+        let file = read_to_string("test_files/account_info_has_tokens.json")
+            .expect("Failed to read test files!");
 
         let _decoded: ResponseWrapper<TypeWrapper<CosmosAccountInfo>> =
             serde_json::from_str(&file).unwrap();

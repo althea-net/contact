@@ -25,7 +25,7 @@ pub async fn maybe_get_optional_tx_info(
             info.result.value.unwrap().sequence,
         )
     } else {
-        (account_number, sequence.unwrap())
+        (account_number.unwrap(), sequence.unwrap())
     };
 
     // likewise with the chain id, if there's a user provided value
