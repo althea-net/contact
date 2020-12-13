@@ -144,6 +144,16 @@ pub struct TXSendResponse {
     pub txhash: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct TxSendErrorResponse {
+    pub code: u64,
+    pub codespace: String,
+    #[serde(deserialize_with = "parse_val_option", default)]
+    pub gas_used: Option<u64>,
+    pub logs: Option<String>,
+    pub raw_log: String,
+}
+
 /// Adapter that lets us parse any val that implements from_str into
 /// the type we want, this helps solve type problems like sigs or addresses
 /// being presented as strings and requiring a parse. For our own types like

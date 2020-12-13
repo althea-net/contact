@@ -1,4 +1,4 @@
-use crate::jsonrpc::error::JsonRpcError;
+use crate::{jsonrpc::error::JsonRpcError, types::TxSendErrorResponse};
 use actix_web::client::Client;
 use actix_web::http::header;
 use serde::{Deserialize, Serialize};
@@ -83,9 +83,15 @@ impl HTTPClient {
             Ok(val) => val,
             Err(e) => return Err(JsonRpcError::BadResponse(e.to_string())),
         };
-        let data: R = match from_value(json) {
+        let data: R = match from_value(json.clone()) {
             Ok(val) => val,
-            Err(e) => return Err(JsonRpcError::BadStruct(e.to_string())),
+            Err(e) => {
+                if let Ok(bad_tx_response) = from_value(json) {
+                    let bad_tx_response: TxSendErrorResponse = bad_tx_response;
+                    return Err(JsonRpcError::BadStruct(bad_tx_response.raw_log));
+                }
+                return Err(JsonRpcError::BadStruct(e.to_string()));
+            }
         };
 
         Ok(data)
