@@ -1,7 +1,4 @@
-use crate::jsonrpc::{client::HTTPClient, error::JsonRpcError};
-use deep_space::address::Address;
-use deep_space::coin::Coin;
-use deep_space::private_key::PrivateKey;
+use crate::jsonrpc::client::HTTPClient;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -31,8 +28,12 @@ impl Contact {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::jsonrpc::error::JsonRpcError;
     use actix::Arbiter;
     use actix::System;
+    use deep_space::address::Address;
+    use deep_space::coin::Coin;
+    use deep_space::private_key::PrivateKey;
     use rand::Rng;
 
     /// If you run the start-chains.sh script in the peggy repo it will pass
