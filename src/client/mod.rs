@@ -33,6 +33,7 @@ mod tests {
     use super::*;
     use actix::Arbiter;
     use actix::System;
+    use rand::Rng;
 
     /// If you run the start-chains.sh script in the peggy repo it will pass
     /// port 1317 on localhost through to the peggycli rest-server which can
@@ -44,7 +45,7 @@ mod tests {
     #[ignore]
     fn test_endpoints() {
         env_logger::init();
-        let key = PrivateKey::from_phrase("cat matter what sense year theory wreck bicycle hobby turtle repeat wrap express crowd memory jewel clerk stool spot hungry frog expire club issue", "").unwrap();
+        let key = PrivateKey::from_phrase("destroy lock crane champion nest hurt chicken leopard field album describe glimpse chimney sort kind peanut worry dilemma anchor dismiss fox there judge arm", "").unwrap();
         let token_name = "footoken".to_string();
 
         let res = System::run(move || {
@@ -64,73 +65,83 @@ mod tests {
             panic!(format!("{:?}", e))
         }
     }
-}
 
-pub async fn test_rpc_calls(
-    contact: Contact,
-    key: PrivateKey,
-    test_token_name: String,
-) -> Result<(), String> {
-    let fee = Coin {
-        denom: test_token_name.clone(),
-        amount: 1u32.into(),
-    };
-    let address = key
-        .to_public_key()
-        .expect("Failed to convert to pubkey!")
-        .to_address();
+    pub async fn test_rpc_calls(
+        contact: Contact,
+        key: PrivateKey,
+        test_token_name: String,
+    ) -> Result<(), String> {
+        let fee = Coin {
+            denom: test_token_name.clone(),
+            amount: 1u32.into(),
+        };
+        let address = key
+            .to_public_key()
+            .expect("Failed to convert to pubkey!")
+            .to_address();
 
-    test_basic_calls(&contact, key, test_token_name, fee.clone(), address).await?;
+        test_basic_calls(&contact, key, test_token_name, fee.clone(), address).await?;
 
-    Ok(())
-}
-
-async fn test_basic_calls(
-    contact: &Contact,
-    key: PrivateKey,
-    test_token_name: String,
-    fee: Coin,
-    address: Address,
-) -> Result<(), String> {
-    // start by validating the basics
-    //
-    // get the latest block
-    // get our account info
-    // send a base transaction
-
-    let res = contact.get_latest_block().await;
-    if res.is_err() {
-        return Err(format!("Failed to get latest block {:?}", res));
+        Ok(())
     }
 
-    let res = contact.get_account_info(address).await;
-    match res {
-        Ok(_) => {}
-        Err(JsonRpcError::NoToken) => {}
-        Err(e) => return Err(format!("Failed to get account info {:?}", e)),
-    }
+    async fn test_basic_calls(
+        contact: &Contact,
+        key: PrivateKey,
+        test_token_name: String,
+        fee: Coin,
+        address: Address,
+    ) -> Result<(), String> {
+        // start by validating the basics
+        //
+        // get the latest block
+        // get our account info
+        // send a base transaction
 
-    let res = contact.get_balances(address).await;
-    if res.is_err() {
-        return Err(format!("Failed to get balances {:?}", res));
-    }
+        let res = contact.get_latest_block().await;
+        if res.is_err() {
+            return Err(format!("Failed to get latest block {:?}", res));
+        }
 
-    let res = contact
-        .create_and_send_transaction(
-            Coin {
-                denom: test_token_name.clone(),
-                amount: 5u32.into(),
-            },
-            fee.clone(),
-            key.to_public_key().unwrap().to_address(),
-            key,
-            None,
-            None,
-            None,
-        )
-        .await;
-    if res.is_err() {
-        return Err(format!("Failed to send tx {:?}", res));
+        let res = contact.get_account_info(address).await;
+        match res {
+            Ok(_) => {}
+            Err(JsonRpcError::NoToken) => {}
+            Err(e) => return Err(format!("Failed to get account info {:?}", e)),
+        }
+
+        let res = contact.get_balances(address).await;
+        if res.is_err() {
+            return Err(format!("Failed to get balances {:?}", res));
+        }
+
+        let mut rng = rand::thread_rng();
+        let secret: [u8; 32] = rng.gen();
+        let cosmos_key = PrivateKey::from_secret(&secret);
+        let cosmos_address = cosmos_key.to_public_key().unwrap().to_address();
+
+        let res = contact
+            .create_and_send_transaction(
+                Coin {
+                    denom: test_token_name.clone(),
+                    amount: 5u32.into(),
+                },
+                fee.clone(),
+                cosmos_address,
+                key,
+                None,
+                None,
+                None,
+            )
+            .await;
+        if res.is_err() {
+            return Err(format!("Failed to send tx {:?}", res));
+        }
+
+        let new_balances = contact.get_balances(cosmos_address).await.unwrap();
+        assert!(!new_balances.result.is_empty());
+        info!("new balances are {:?}", new_balances);
+
+        Ok(())
     }
-    Ok(())
 }

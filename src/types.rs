@@ -132,15 +132,7 @@ pub struct OptionalTXInfo {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct TXSendResponse {
-    #[serde(deserialize_with = "parse_val_option", default)]
-    pub gas_used: Option<u64>,
-    #[serde(deserialize_with = "parse_val_option", default)]
-    pub gas_wanted: Option<u64>,
-    #[serde(deserialize_with = "parse_val_option")]
-    pub height: Option<u64>,
     pub logs: Option<Value>,
-    #[serde(default)]
-    pub raw_log: String,
     pub txhash: String,
 }
 
