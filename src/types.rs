@@ -136,8 +136,8 @@ pub struct TXSendResponse {
     pub gas_used: Option<u64>,
     #[serde(deserialize_with = "parse_val_option", default)]
     pub gas_wanted: Option<u64>,
-    #[serde(deserialize_with = "parse_val")]
-    pub height: u64,
+    #[serde(deserialize_with = "parse_val_option")]
+    pub height: Option<u64>,
     pub logs: Option<Value>,
     #[serde(default)]
     pub raw_log: String,
