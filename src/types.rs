@@ -140,7 +140,7 @@ pub struct TXSendResponse {
     pub height: u64,
     pub logs: Option<Value>,
     #[serde(default)]
-    pub raw_log: Value,
+    pub raw_log: String,
     pub txhash: String,
 }
 
