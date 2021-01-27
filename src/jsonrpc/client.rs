@@ -38,9 +38,9 @@ impl HTTPClient {
             json!(params)
         );
         // the response payload size limit for this request, almost everything
-        // will set this to None, and get the default 64k, but some requests
+        // will set this to None, and get the default 1mb, but some requests
         // need bigger buffers (like full block requests)
-        let limit = request_size_limit.unwrap_or(65536);
+        let limit = request_size_limit.unwrap_or(1_000_000);
         let url_with_method = format!("{}/{}", self.url, method);
         // if we don't have a payload this is a get request
         let res = if let Some(params) = params {
