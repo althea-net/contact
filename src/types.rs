@@ -120,7 +120,7 @@ pub struct BlockSignature {
     #[serde(deserialize_with = "parse_val")]
     pub validator_address: Address,
     pub timestamp: String,
-    pub signature: String,
+    pub signature: Option<String>,
 }
 
 #[derive(Debug, Clone)]
