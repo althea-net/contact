@@ -24,6 +24,13 @@ impl Contact {
             .await
     }
 
+    pub async fn get_syncing_status(&self) -> Result<SyncingStatus, JsonRpcError> {
+        let none: Option<bool> = None;
+        self.jsonrpc_client
+            .request_method("syncing", none, self.timeout, None)
+            .await
+    }
+
     /// Gets account info for the provided Cosmos account using the accounts endpoint
     /// accounts do not have any info if they have no tokens or are otherwise never seen
     /// before an Ok(None) result indicates this

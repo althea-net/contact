@@ -52,6 +52,12 @@ mod tests {
         let res = System::run(move || {
             let contact = Contact::new("http://localhost:1317", Duration::from_secs(30));
             Arbiter::spawn(async move {
+                let res = contact.get_syncing_status().await;
+                if res.is_err() {
+                    println!("{:?}", res);
+                    System::current().stop_with_code(1);
+                }
+
                 let res = test_rpc_calls(contact, key, token_name).await;
                 if res.is_err() {
                     println!("{:?}", res);

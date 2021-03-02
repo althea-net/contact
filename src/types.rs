@@ -131,6 +131,11 @@ pub struct OptionalTXInfo {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct SyncingStatus {
+    pub syncing: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct TXSendResponse {
     pub logs: Option<Value>,
     pub txhash: String,
