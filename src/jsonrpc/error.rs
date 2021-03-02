@@ -16,6 +16,7 @@ pub enum JsonRpcError {
         data: String,
     },
     BadInput(String),
+    ChainNotRunning,
 }
 
 impl Display for JsonRpcError {
@@ -37,6 +38,9 @@ impl Display for JsonRpcError {
                 "JsonRPC Response error code {} message {} data {:?}",
                 code, message, data
             ),
+            JsonRpcError::ChainNotRunning => {
+                write!(f, "JsonRPC this node is waiting on a blockchain start")
+            }
         }
     }
 }

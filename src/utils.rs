@@ -35,7 +35,11 @@ pub async fn maybe_get_optional_tx_info(
         chain_id
     } else {
         let block = client.get_latest_block().await?;
-        block.block.header.chain_id
+        if let Some(block) = block.block {
+            block.header.chain_id
+        } else {
+            return Err(JsonRpcError::ChainNotRunning);
+        }
     };
 
     Ok(OptionalTXInfo {

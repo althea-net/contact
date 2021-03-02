@@ -12,7 +12,13 @@ impl Contact {
             .await;
 
         match res {
-            Ok(res) => Ok(res.block.last_commit.height),
+            Ok(res) => {
+                if let Some(block) = res.block {
+                    Ok(block.last_commit.height)
+                } else {
+                    Err(JsonRpcError::ChainNotRunning)
+                }
+            }
             Err(e) => Err(e),
         }
     }

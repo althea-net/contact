@@ -84,7 +84,7 @@ pub struct BlockVersion {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct LatestBlockEndpointResponse {
     pub block_id: BlockId,
-    pub block: Block,
+    pub block: Option<Block>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -202,5 +202,11 @@ mod tests {
 
         let _decoded: ResponseWrapper<TypeWrapper<CosmosAccountInfo>> =
             serde_json::from_str(&file).unwrap();
+    }
+
+    #[test]
+    fn decode_starting_block() {
+        let val = r#"{"block_id":{"hash":"","parts":{"total":0,"hash":""}},"block":null}"#;
+        let _decoded: LatestBlockEndpointResponse = serde_json::from_str(&val).unwrap();
     }
 }
