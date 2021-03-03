@@ -17,7 +17,7 @@ use serde::Serialize;
 use std::fmt::Debug;
 use std::time::Instant;
 use std::{clone::Clone, time::Duration};
-use tokio::time::sleep as delay_for;
+use tokio::time::delay_for;
 
 impl Contact {
     /// The advanced version of create_and_send transaction that expects you to
