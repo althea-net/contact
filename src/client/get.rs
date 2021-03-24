@@ -8,7 +8,7 @@ impl Contact {
         let none: Option<bool> = None;
         let res: Result<LatestBlockEndpointResponse, JsonRpcError> = self
             .jsonrpc_client
-            .request_method("blocks/latest", none, self.timeout, None)
+            .request_method("blocks/latest", none, self.timeout, Some(5_000_000))
             .await;
 
         match res {
@@ -26,7 +26,7 @@ impl Contact {
     pub async fn get_latest_block(&self) -> Result<LatestBlockEndpointResponse, JsonRpcError> {
         let none: Option<bool> = None;
         self.jsonrpc_client
-            .request_method("blocks/latest", none, self.timeout, None)
+            .request_method("blocks/latest", none, self.timeout, Some(5_000_000))
             .await
     }
 
