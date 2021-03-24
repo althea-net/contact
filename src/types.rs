@@ -117,8 +117,8 @@ pub struct LastCommit {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BlockSignature {
     pub block_id_flag: u64,
-    #[serde(deserialize_with = "parse_val")]
-    pub validator_address: Address,
+    #[serde(deserialize_with = "parse_val_option")]
+    pub validator_address: Option<Address>,
     pub timestamp: String,
     pub signature: Option<String>,
 }
@@ -202,6 +202,14 @@ mod tests {
 
         let _decoded: ResponseWrapper<TypeWrapper<CosmosAccountInfo>> =
             serde_json::from_str(&file).unwrap();
+    }
+
+    #[test]
+    fn decode_block() {
+        let file = read_to_string("test_files/test_block_althea_testnet1v5.json")
+            .expect("Failed to read test files!");
+
+        let _decoded: LatestBlockEndpointResponse = serde_json::from_str(&file).unwrap();
     }
 
     #[test]

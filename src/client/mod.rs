@@ -50,7 +50,10 @@ mod tests {
         let token_name = "footoken".to_string();
 
         let res = System::run(move || {
-            let contact = Contact::new("http://localhost:1317", Duration::from_secs(30));
+            let contact = Contact::new(
+                "http://testnet1-rpc.althea.net:1317",
+                Duration::from_secs(30),
+            );
             Arbiter::spawn(async move {
                 let res = contact.get_syncing_status().await;
                 if res.is_err() {
