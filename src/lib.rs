@@ -9,6 +9,6 @@ extern crate serde_json;
 extern crate log;
 
 pub mod client;
-pub mod jsonrpc;
+pub mod error;
 pub mod types;
 pub mod utils;

@@ -1,6 +1,6 @@
 use crate::client::Contact;
 use crate::jsonrpc::error::JsonRpcError;
-use crate::types::OptionalTXInfo;
+use crate::types::OptionalTxInfo;
 use deep_space::address::Address;
 
 /// retrieves 'optional' components of a transaction if not provided.

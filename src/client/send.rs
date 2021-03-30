@@ -1,9 +1,6 @@
 use crate::client::Contact;
-use crate::jsonrpc::error::JsonRpcError;
 use crate::types::*;
 use crate::utils::maybe_get_optional_tx_info;
-use actix_web::client::ConnectError;
-use actix_web::client::SendRequestError;
 use deep_space::address::Address;
 use deep_space::coin::Coin;
 use deep_space::msg::{Msg, SendMsg};
@@ -17,7 +14,6 @@ use serde::Serialize;
 use std::fmt::Debug;
 use std::time::Instant;
 use std::{clone::Clone, time::Duration};
-use tokio::time::delay_for;
 
 impl Contact {
     /// The advanced version of create_and_send transaction that expects you to

@@ -1,220 +1,87 @@
+use cosmos_sdk_proto::cosmos::auth::v1beta1::BaseAccount as ProtoBaseAccount;
+use cosmos_sdk_proto::cosmos::base::v1beta1::Coin as ProtoCoin;
 use deep_space::address::Address;
 use deep_space::public_key::PublicKey;
+use num256::Uint256;
 use serde::de::Deserializer;
 use serde::{de, Deserialize};
 use serde_json::Value;
 use std::{fmt::Display, str::FromStr};
+use tendermint_proto::types::Block;
 
-/// A generic wrapper for Cosmos REST server responses which always
-/// include the height
+/// This struct represents the status of a Cosmos chain, instead of just getting the
+/// latest block height we mandate that chain status is used, this allows callers to
+/// handle the possibility of a halted chain explicitly since essentially all requests
+/// about block height come with assumptions about the chains status
+pub enum ChainStatus {
+    /// The chain is operating correctly and blocks are being produced
+    Moving { block_height: u64 },
+    /// The chain is operating correctly, but the node we made this request
+    /// to is catching up and we should not trust it's responses to be
+    /// up to date
+    Syncing,
+    /// The chain is halted, this node is waiting for the chain to start again
+    /// the caller should take appropriate action to await the chain start
+    WaitingToStart,
+}
+
+/// This struct represents potential responses from the latest block endpoint
+/// we can either be syncing, waiting for the chain to start, or have the the
+/// actual latest block to the best of the nodes knowledge, which isn't at all
+/// a guarantee
+pub enum LatestBlock {
+    /// The chain is operating correctly and blocks are being produced, this is
+    /// the latest one this node has access to
+    Latest { block: Block },
+    /// The chain is operating correctly, but the node we made this request
+    /// to is catching up and we should not trust it's responses to be
+    /// up to date
+    Syncing { block: Block },
+    /// The chain is halted, this node is waiting for the chain to start again
+    /// the caller should take appropriate action to await the chain start
+    WaitingToStart,
+}
+
+/// This is a parsed and validated version of the Cosmos base account proto
+/// struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ResponseWrapper<T> {
-    #[serde(deserialize_with = "parse_val")]
-    pub height: u64,
-    pub result: T,
-}
-
-/// A generic wrapper for Cosmos REST server responses which always
-/// include the struct type
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TypeWrapper<T> {
-    #[serde(rename = "type")]
-    pub struct_type: String,
-    pub value: T,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct PubKeyWrapper {
-    #[serde(rename = "type")]
-    key_type: String,
-    #[serde(deserialize_with = "parse_val")]
-    value: PublicKey,
-}
-
-fn default_account_number() -> u64 {
-    0
-}
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct CosmosAccountInfo {
-    #[serde(deserialize_with = "parse_val")]
+pub struct BaseAccount {
     pub address: Address,
-    pub public_key: Option<PubKeyWrapper>,
-    #[serde(deserialize_with = "parse_val", default = "default_account_number")]
-    pub sequence: u64,
-    #[serde(default = "default_account_number", deserialize_with = "parse_val")]
-    pub account_number: u64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct BlockId {
-    pub hash: String,
-    pub parts: BlockParts,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct BlockParts {
-    pub total: u64,
-    pub hash: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct BlockHeader {
-    pub version: BlockVersion,
-    pub chain_id: String,
-    pub time: String,
-    pub last_block_id: BlockId,
-    pub last_commit_hash: String,
-    pub data_hash: String,
-    pub validators_hash: String,
-    pub next_validators_hash: String,
-    pub consensus_hash: String,
-    pub app_hash: String,
-    pub last_results_hash: String,
-    pub evidence_hash: String,
-    #[serde(deserialize_with = "parse_val")]
-    pub proposer_address: Address,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct BlockVersion {
-    #[serde(deserialize_with = "parse_val")]
-    pub block: u64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct LatestBlockEndpointResponse {
-    pub block_id: BlockId,
-    pub block: Option<Block>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct Block {
-    pub header: BlockHeader,
-    pub data: BlockData,
-    pub evidence: BlockEvidence,
-    pub last_commit: LastCommit,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct BlockData {
-    pub txs: Option<Vec<String>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct BlockEvidence {
-    pub evidence: Option<Vec<String>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct LastCommit {
-    #[serde(deserialize_with = "parse_val")]
-    pub height: u64,
-    pub round: u64,
-    pub block_id: BlockId,
-    pub signatures: Vec<BlockSignature>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct BlockSignature {
-    pub block_id_flag: u64,
-    #[serde(deserialize_with = "parse_val_option")]
-    pub validator_address: Option<Address>,
-    pub timestamp: String,
-    pub signature: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct OptionalTXInfo {
-    pub chain_id: String,
+    /// an unprocessed proto struct containing a pubkey type
+    pub pubkey: Vec<u8>,
     pub account_number: u64,
     pub sequence: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct SyncingStatus {
-    pub syncing: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct TXSendResponse {
-    pub logs: Option<Value>,
-    pub txhash: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct TxSendErrorResponse {
-    pub code: u64,
-    pub codespace: String,
-    #[serde(deserialize_with = "parse_val_option", default)]
-    pub gas_used: Option<u64>,
-    pub logs: Option<String>,
-    pub raw_log: String,
-}
-
-/// Adapter that lets us parse any val that implements from_str into
-/// the type we want, this helps solve type problems like sigs or addresses
-/// being presented as strings and requiring a parse. For our own types like
-/// Address we just implement deserialize such that the string representation
-/// is accepted implicitly. But for native types like u128 this is the only
-/// way to go
-pub fn parse_val<'de, T, D>(deserializer: D) -> Result<T, D::Error>
-where
-    T: FromStr,
-    T::Err: Display,
-    D: Deserializer<'de>,
-{
-    let s: String = String::deserialize(deserializer)?;
-    T::from_str(&s).map_err(de::Error::custom)
-}
-
-fn parse_val_option<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
-where
-    T: FromStr,
-    T::Err: Display,
-    D: Deserializer<'de>,
-{
-    let s: String = String::deserialize(deserializer)?;
-    match T::from_str(&s) {
-        Ok(val) => Ok(Some(val)),
-        Err(_e) => Ok(None),
+impl From<ProtoBaseAccount> for BaseAccount {
+    fn from(value: ProtoBaseAccount) -> Self {
+        BaseAccount {
+            address: value.address.parse().unwrap(),
+            pubkey: value.pub_key.unwrap().value,
+            account_number: value.account_number,
+            sequence: value.sequence,
+        }
     }
 }
 
-/// A blank struct, used to parse blank responses
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct Blank {}
+/// A parsed version of the Cosmos coin struct, note
+/// that Cosmos sdk int values are capped at unint256 max
+/// there is a hole in this mapping for coins with negative
+/// values, but I've decided not to handle this case for now
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Coin {
+    denom: String,
+    amount: Uint256,
+}
+
+impl From<ProtoCoin> for Coin {
+    fn from(value: ProtoCoin) -> Self {
+        Coin {
+            denom: value.denom,
+            amount: value.amount.parse().unwrap(),
+        }
+    }
+}
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::read_to_string;
-
-    #[test]
-    fn decode_account_info() {
-        let file = read_to_string("test_files/account_info_active.json")
-            .expect("Failed to read test files!");
-
-        let _decoded: ResponseWrapper<TypeWrapper<CosmosAccountInfo>> =
-            serde_json::from_str(&file).unwrap();
-
-        let file = read_to_string("test_files/account_info_has_tokens.json")
-            .expect("Failed to read test files!");
-
-        let _decoded: ResponseWrapper<TypeWrapper<CosmosAccountInfo>> =
-            serde_json::from_str(&file).unwrap();
-    }
-
-    #[test]
-    fn decode_block() {
-        let file = read_to_string("test_files/test_block_althea_testnet1v5.json")
-            .expect("Failed to read test files!");
-
-        let _decoded: LatestBlockEndpointResponse = serde_json::from_str(&file).unwrap();
-    }
-
-    #[test]
-    fn decode_starting_block() {
-        let val = r#"{"block_id":{"hash":"","parts":{"total":0,"hash":""}},"block":null}"#;
-        let _decoded: LatestBlockEndpointResponse = serde_json::from_str(&val).unwrap();
-    }
-}
+mod tests {}
